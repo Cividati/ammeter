@@ -1,168 +1,170 @@
-# agents-usage
+# Ammeter
 
-Claude Code, Codex, OpenRouter and DeepSeek usage, credits and quota limits, in two surfaces on
-Linux:
+One meter for the usage, credits and quota limits of your AI accounts — as a native desktop app and
+as a GNOME top-bar indicator.
 
-- `ai-usage` — a small always-on-top desktop window (drag to move, right-click for the menu).
-- `gnome-extension/` — a GNOME top-bar indicator that shows the same numbers in a click menu.
+![Ammeter on Ubuntu](docs/screenshot.png)
 
-Both read their numbers from the same place: the logins the CLIs already store on this machine.
-Nothing is uploaded anywhere, and no extra account or API key beyond the providers' own is needed.
+An ammeter measures the current flowing through a circuit. This one measures what your Claude Code,
+Codex, OpenRouter and DeepSeek accounts are drawing: session and weekly quota with reset times and
+countdowns, plus the prepaid balances that quietly run dry.
 
-## Layout
+## Why another usage monitor
 
+- **It uses the logins you already have.** Claude Code and Codex keep an OAuth login on disk and the
+  same usage endpoints their own CLIs read; OpenRouter and DeepSeek are queried with the API keys
+  Hermes already stores. No dashboard login, no browser cookies, no screenshot scraping, no
+  telemetry — nothing leaves the machine.
+- **It survives a rate limit.** Claude's endpoint answers `429` when polled hard, so every provider's
+  last good answer is cached on disk: a fresh process (the CLI, the extension, a second app window)
+  still shows the previous numbers, labelled with the reason, instead of an error.
+- **It knows when a number went stale.** Each quota row carries the window's reset timestamp. If a
+  cached window already rolled over, the percentage is dropped and replaced with
+  *awaiting fresh numbers* — showing a number that is known to be wrong is worse than showing none.
+- **One data layer, three front-ends.** The app, the tkinter floating window and the GNOME extension
+  all render the same normalised rows from `ammeter/core.py`; nothing is formatted twice.
+
+## Providers
+
+| Provider | Credential it reads | Endpoint | What it shows |
+|---|---|---|---|
+| **Claude** | `~/.claude/.credentials.json` | `GET api.anthropic.com/api/oauth/usage` | 5-hour and weekly quota, per-model weekly buckets, reset times |
+| **Codex** | `~/.codex/auth.json` | `GET chatgpt.com/backend-api/wham/usage` | session and weekly rate limits, plan, reset times, credits |
+| **OpenRouter** | `OPENROUTER_API_KEY` in `~/.hermes/.env` | `GET openrouter.ai/api/v1/credits` + `/key` | credit balance, today's and this month's spend |
+| **DeepSeek** | `DEEPSEEK_API_KEY` in `~/.hermes/.env` | `GET api.deepseek.com/user/balance` | credit balance |
+
+Quota providers get a bar that turns amber at 70% and red at 90%; pay-as-you-go providers get their
+balance, because a percentage of a top-up you can refill is not the same thing as a quota you cannot.
+
+## Install
+
+Requirements: a Linux desktop with Python 3.10+; PyGObject with `Gtk-4.0` and `Adw-1.0` for the app
+(Ubuntu 24.04+ and Fedora ship them), `python3-tk` only for `--float`, and `gjs` only for the tests.
+
+```sh
+git clone git@github.com:Cividati/ammeter.git ~/Development/ammeter
+cd ~/Development/ammeter
+./scripts/install.sh          # symlinks the command, the desktop entry and the GNOME extension
+ammeter                       # or launch "Ammeter" from the app grid
 ```
-ai_usage.py                 the data layer + CLI (stdlib only): fetchers, bars, cache, selftest
-ai-usage                    symlink to ai_usage.py — the stable command name everything calls
-ai_usage_gtk.py             GTK4 + libadwaita app (the default front-end)
-data/dev.cividati.AIUsage.desktop  launcher entry so it appears in the app grid / dock
-data/icons/                 provider marks (from simple-icons) + the app icon
-gnome-extension/
-  metadata.json             uuid: ai-usage@cividati
-  extension.js              PanelMenu button, 120s timer, Gio.Subprocess -> ai-usage --json
-  format.js                 pure formatting (bars, Pango markup, severity) — no shell imports
-  stylesheet.css            panel icon colours + monospace menu rows
-scripts/
-  fetch-icons.py            regenerate data/icons/*.svg from simple-icons (CC0-1.0)
-  grab-x11.py               screenshot an X screen to PNG (headless verification helper)
-tests/
-  test-format.js            runs format.js in gjs against real `ai-usage --json`
-  icon-check.py             svgs parse and every icon name resolves in the icon theme
-  glyph-check.py            renders icon candidates in tk so tofu glyphs are obvious
-```
+
+`install.sh` uses symlinks on purpose: edit the checkout and the installed command follows. Use
+`./scripts/install.sh --undo` to remove everything it created.
+
+If your checkout is not at `~/Development/ammeter`, change `SCRIPT` at the top of
+`gnome-extension/extension.js` to the path of your `bin/ammeter`.
 
 ## Usage
 
 ```sh
-ai-usage                     # native GTK4/libadwaita app
-ai-usage --float             # the older frameless always-on-top tkinter window
-ai-usage --framed            # that window with normal WM decorations (debug/screenshot aid)
-ai-usage --text              # print to stdout and exit
-ai-usage --json              # machine-readable, this is what the GNOME extension consumes
-ai-usage --selftest          # bars, reset formatting, window expiry, stale + disk-cache fallback
+ammeter              # native GTK4 + libadwaita app
+ammeter --float      # frameless, always-on-top tkinter window (see the note below)
+ammeter --text       # plain snapshot for a terminal
+ammeter --json       # machine-readable; this is what the GNOME extension consumes
+ammeter --selftest   # formatting, window expiry, stale and cache fallback; no network
+ammeter --version
 ```
 
-The GTK app is launched with `/usr/bin/python3`, which is where PyGObject, `Gtk-4.0` and `Adw-1.0`
-are installed here; the data layer is stdlib-only, so the CLI and the extension work on any
-interpreter. `ai-usage` execs the GTK script (`os.execv`, no second process, no duplicated module
-state) and falls back to the tkinter window if GTK is unavailable.
+```
+✳  CLAUDE  (pro)
+     5h        25%  ▓▓▓░░░░░░░░░ resets 14:20 · in 2h17m
+     7d        73%  ▓▓▓▓▓▓▓▓▓░░░ resets Wed 07 Oct 20:00 · in 2d7h
+◆  CODEX  (go)
+     session  100%  ▓▓▓▓▓▓▓▓▓▓▓▓ resets Mon 02 Nov 14:33 · in 28d3h
+⇄  OPENROUTER
+     balance                     $7.92 left of $60.00
+     spend                       $0.00 today   $2.09 month
+◉  DEEPSEEK  (available)
+     balance                     USD 3.39
 
-## How it is wired in
+4/4 providers · Ammeter 0.3.0 · refreshed every 120s
+```
 
-Sources live here; the installed paths are symlinks to this checkout, so edits take effect
-immediately and there is nothing to re-copy.
+## GNOME top-bar indicator
+
+The extension shows a gauge icon that turns amber at 70% and red at 90% (or when a plan limit is
+reached, or data is stale); clicking it lists every provider, the same rows the app renders.
+
+GNOME Shell loads extensions when the session starts and Wayland cannot reload it in place, so after
+installing: **log out and back in**, then check
 
 ```sh
-ln -sfn ~/Development/agents-usage/ai-usage ~/.local/bin/ai-usage
-ln -sfn ~/Development/agents-usage/ai_usage_gtk.py ~/.local/bin/ai-usage-gtk
-ln -sfn ~/Development/agents-usage/data/dev.cividati.AIUsage.desktop \
-        ~/.local/share/applications/dev.cividati.AIUsage.desktop
-ln -sfn ~/Development/agents-usage/gnome-extension \
-        ~/.local/share/gnome-shell/extensions/ai-usage@cividati
-gsettings get org.gnome.shell enabled-extensions   # must contain ai-usage@cividati
+gnome-extensions info ammeter@cividati      # State: ACTIVE
+journalctl --user -b -o cat /usr/bin/gnome-shell | grep -i ammeter
 ```
 
-The extension is loaded by GNOME Shell at session start. On Wayland the shell cannot be reloaded
-in place, so after enabling it once, log out and back in. Verify with:
+## Architecture
+
+```
+bin/ammeter              launcher: makes the package importable, hands over to ammeter.cli
+ammeter/
+  __init__.py            version, app id, palette, icon names
+  providers.py           one fetcher per provider, each returning a normalised entry
+  formatting.py          pure helpers: bars, reset times, severities, error wording
+  core.py                collect(), the row schema, stale handling, expired-window rule
+  cache.py               last-good cache on disk (~/.cache/ammeter/last-good.json)
+  cli.py                 arguments, --text/--json/--selftest, launches a front-end
+  gtk_app.py             GTK4 + libadwaita app (Adw.PreferencesGroup per provider)
+  float_window.py        tkinter always-on-top window
+  ui.css                 stylesheet, with {colour} placeholders filled from __init__.py
+gnome-extension/         top-bar indicator (uuid ammeter@cividati)
+data/                    desktop entry and the provider/app icons
+docs/screenshot.png      the image at the top of this file
+scripts/                 install.sh, fetch-icons.py, enable-extension.py, grab-x11.py
+tests/                   test-format.js (gjs), icon-check.py, glyph-check.py
+```
+
+Dependencies point one way — `formatting` ← `providers` ← `core` ← `cli`/front-ends — so the data
+layer has no UI imports and the UI has no HTTP code. Each provider entry is a plain dict:
+
+```python
+{"key": "claude", "name": "CLAUDE", "sub": "pro",
+ "rows": [{"label": "5h", "pct": 25, "reset": "2026-10-05T13:20:00+00:00",
+           "note": "resets 14:20 · in 2h17m"}],
+ "stale": True, "why": "rate limited (HTTP 429)"}   # only when degraded
+```
+
+Add a provider by writing one `fetch_*()` in `providers.py` and adding it to `PROVIDERS`, plus a
+colour in `__init__.py` and an icon in `data/icons/` — every front-end picks it up.
+
+## Tests
 
 ```sh
-gnome-extensions info ai-usage@cividati            # State: ACTIVE
-journalctl --user -b -o cat /usr/bin/gnome-shell | grep -i ai-usage
+ammeter --selftest                            # pure Python, no network
+/usr/bin/python3 tests/icon-check.py          # svgs parse; every icon name resolves
+gjs -m tests/test-format.js                   # extension formatting against the real --json output
 ```
 
-If the shell refuses a symlinked extension directory, replace it with a copy and re-run the
-install from the checkout when you change something:
+The GTK app and the extension cannot be unit-tested headlessly, so they are verified by rendering
+them: `scripts/grab-x11.py` screenshots an X server, and the app runs under `xvfb-run` with
+`GDK_BACKEND=x11 GSK_RENDERER=cairo` and no session bus. That is how `docs/screenshot.png` is made.
 
-```sh
-rm ~/.local/share/gnome-shell/extensions/ai-usage@cividati
-cp -r ~/Development/agents-usage/gnome-extension \
-      ~/.local/share/gnome-shell/extensions/ai-usage@cividati
-```
+## Notes and pitfalls
 
-## Data sources
+- **Claude's usage endpoint rate-limits hard.** `429` with no `Retry-After`; in testing it cleared in
+  two to three minutes. Hence the 120 s interval and the two-layer last-good cache. Stale blocks are
+  labelled with the reason, e.g. `— stale (rate limited (HTTP 429))`.
+- **The Codex endpoint is not a public API** (`chatgpt.com/backend-api/wham/usage`), and
+  `~/.codex/auth.json` / `~/.claude/.credentials.json` are secrets — never log or commit them.
+- **GTK4 cannot pin a window on Wayland**: there is no keep-above API, so the GTK app is a normal
+  decorated window and `--float` remains the pinned option (tkinter, via XWayland).
+- **PyGObject is rarely on the interpreter that `env python3` finds.** Here it exists only on
+  `/usr/bin/python3`, so the GTK app is launched explicitly on that interpreter and the data layer
+  deliberately stays stdlib-only so the CLI works anywhere.
+- **A unique `GApplication` exits silently with no session bus** — no window, no traceback, empty
+  log. Ammeter falls back to `NON_UNIQUE` when `DBUS_SESSION_BUS_ADDRESS` is unset, which is what
+  makes headless screenshots possible. The same rule means a second launch is forwarded to the
+  running instance, so restart the app to pick up code changes.
+- **`Adw.PreferencesPage` scrolls and clamps itself**; wrapping it in `Adw.Clamp` or a
+  `ScrolledWindow` breaks its height allocation. Swap a freshly built page in with
+  `Adw.ToolbarView.set_content()` to refresh.
+- **Icons are shipped svgs, not font glyphs.** The provider marks come from
+  [simple-icons](https://simple-icons.org) (CC0-1.0) via `scripts/fetch-icons.py`; a unicode star in
+  a coloured circle depends on the running font and quietly becomes a placeholder when it is missing.
+  `tests/glyph-check.py` exists for the tkinter front-end, which cannot load svg.
 
-| Provider | Credential | Endpoint | Fields used |
-|---|---|---|---|
-| Claude | `~/.claude/.credentials.json` (`claudeAiOauth.accessToken`) | `GET api.anthropic.com/api/oauth/usage`, headers `anthropic-beta: oauth-2025-04-20` | `five_hour`, `seven_day`, `seven_day_opus/sonnet` → `utilization`, `resets_at` |
-| Codex | `~/.codex/auth.json` (`tokens.access_token` + `tokens.account_id`) | `GET chatgpt.com/backend-api/wham/usage`, header `chatgpt-account-id` | `rate_limit.primary_window/secondary_window.used_percent`, `reset_at`, `plan_type`, `credits` |
-| OpenRouter | `OPENROUTER_API_KEY` in `~/.hermes/.env` | `GET openrouter.ai/api/v1/credits` + `/api/v1/key` | `total_credits`, `total_usage`, `usage_daily`, `usage_monthly` |
-| DeepSeek | `DEEPSEEK_API_KEY` in `~/.hermes/.env` | `GET api.deepseek.com/user/balance` | `is_available`, `balance_infos[].total_balance`, `currency` |
+## Licence
 
-Adding a provider = one `fetch_<name>()` returning
-`{"name", "rows": [{"label", "pct"|None, "note"}], "sub"}`, appended to `FETCHERS`, plus a colour
-and icon entry (`ACCENT`/`ICONS` in `ai-usage`, `COLOR`/`ICON` in `format.js`).
-
-## Pitfalls found the hard way
-
-- **GTK4 cannot be an always-on-top widget on Wayland.** There is no keep-above API and no
-  borderless-client protocol the compositor will honour, so the GTK app is a normal decorated
-  window with a headerbar-in-a-ToolbarView layout. The frameless floating window survives as
-  `ai-usage --float` (tkinter, XWayland) for anyone who wants it pinned over other windows.
-- **PyGObject lives on the system interpreter only.** Here `/usr/bin/python3` (3.14.4) has
-  `gi 3.56.2`, `Gtk 4.22`, `Adw 1.9`, while other interpreters on `PATH` have no `gi` at all. The
-  GTK front-end therefore hard-codes `/usr/bin/python3` as its launcher and is exec'd from
-  `ai-usage`; the data layer stays stdlib-only so nothing else inherits that dependency.
-- **Headless screenshots of a GTK4 app** need `GDK_BACKEND=x11` (or the window lands on the real
-  session), `GSK_RENDERER=cairo` (Xvfb has no DRI3, so GL/Vulkan fallbacks spew `libEGL warning`),
-  and `xvfb-run`; `scripts/grab-x11.py` then captures it like any X client.
-- **`Adw.PreferencesPage` scrolls and clamps itself** — do not wrap it in an `Adw.Clamp` or a
-  `Gtk.ScrolledWindow`, or the inner scroller loses its height allocation. Swap a freshly built page
-  in with `Adw.ToolbarView.set_content()` to rebuild, and `Adw.ActionRow.set_subtitle_lines(2)` for
-  notes that wrap.
-
-- **Provider marks come from simple-icons, not from a font.** The badges are `Gtk.Image`s of
-  shipped symbolic svgs (`data/icons/ai-usage-<provider>-symbolic.svg`, regenerated by
-  `scripts/fetch-icons.py`, upstream is CC0-1.0). A unicode glyph in a coloured circle depends on
-  the running font having that codepoint, and looks like a placeholder when it does — and the badges
-  are the one thing you actually look at. Badge colours: Claude `#d97757` and OpenAI `#412991` from
-  simple-icons, OpenRouter green, DeepSeek `#4d6bfe`.
-- **A unique `GApplication` exits silently with no session bus.** Under `xvfb-run` the app
-  registered, found no bus, and returned immediately with an empty log — no window, no traceback.
-  The app now uses `Gio.ApplicationFlags.NON_UNIQUE` when `DBUS_SESSION_BUS_ADDRESS` is unset, which
-  is what makes headless screenshot checks possible. The same rule means a second launch is
-  forwarded to the running instance, so restart the app to pick up code changes.
-- **Claude's usage endpoint rate-limits hard.** Rapid polling returns `HTTP 429 Too Many Requests`
-  with no `Retry-After`; it cleared in roughly 2–3 minutes here. Two layers of last-good cache cover
-  it: `_LAST` in-process, plus `~/.cache/ai-usage/last-good.json` so a 429 in a *fresh* process
-  (the one-shot `--text`, the GNOME extension's subprocess) still shows the previous numbers instead
-  of an error. Stale blocks are labelled with the reason, e.g. `— stale (rate limited (HTTP 429))`.
-- **A cached window that already rolled over is not shown as a percentage.** Every quota row carries
-  its reset timestamp, so when the reset has passed while the data was stale the bar is dropped and
-  the row reads `window reset 14:20 — awaiting fresh numbers`. Those numbers are known to be wrong;
-  showing them anyway is worse than showing nothing.
-- **Reset times are printed absolute and relative** (`resets Wed 07 Oct 20:00 · in 2d8h`), with the
-  date included whenever the reset is not today. Codex's 30-day window makes this mandatory — a bare
-  `Mon 14:33` was meaningless.
-- **The Codex usage endpoint is not a public API** (`chatgpt.com/backend-api/wham/usage`), and
-  `~/.codex/auth.json` and `~/.claude/.credentials.json` are secrets — never log or commit them.
-- **GNOME Shell 50 API facts**, checked against the installed shell (`libshell-18.so` gresource):
-  `PopupMenuItem` has no `setLabel()` (use `item.label.text`), `addToStatusArea(role, indicator,
-  position, box)` throws on a duplicate role, and the role is freed when the indicator is destroyed
-  (so `disable()` must destroy the button).
-- **`Gio.Subprocess.communicate_utf8_async` is not promisified by default** in an extension: call
-  `Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async', 'communicate_utf8_finish')`
-  first. Promisified, it resolves to `[stdout, stderr]` (no leading boolean).
-- **Icon glyphs:** `U+2B22 ⬢`, `U+2B21 ⬡`, `U+2B24 ⬤` and `U+29BF` are missing from the DejaVu
-  fonts here and render as tofu. The icons in use (`U+2733 ✳`, `U+25C6 ◆`, `U+21C4 ⇄`, `U+25C9 ◉`)
-  are present in both DejaVu Sans and DejaVu Sans Mono. Re-check with `tests/glyph-check.py`.
-- **Progress bars need a font with block elements.** DejaVu has `U+2593`/`U+2591`; Ubuntu Mono does
-  not. The GNOME menu rows therefore pin `font-family: "DejaVu Sans Mono", monospace`.
-
-## Testing
-
-```sh
-ai-usage --selftest                      # python side
-gjs -m tests/test-format.js              # extension formatting, real data, real shell JS engine
-```
-
-Headless visual check (no desktop screenshots needed, and gnome-shell's Screenshot D-Bus call is
-denied for unprivileged callers here):
-
-```sh
-python3 -m venv .venv && .venv/bin/pip install python-xlib    # only for the grab helper
-xvfb-run -a -s "-screen 0 700x460x24" bash -c \
-  './ai-usage --framed & sleep 12; .venv/bin/python scripts/grab-x11.py /tmp/shot.png; kill %1'
-```
-
-A plain `ffmpeg -f x11grab` of `:0.0` returns an all-black frame (XWayland root is not painted by
-the compositor), which is why the helper goes through `Xvfb` instead.
+MIT — see [LICENSE](LICENSE). The provider marks in `data/icons` are from simple-icons (CC0-1.0);
+Claude, Codex, OpenRouter and DeepSeek are trademarks of their respective owners, used here only to
+identify the accounts being measured.

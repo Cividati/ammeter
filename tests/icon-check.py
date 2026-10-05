@@ -9,8 +9,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 ICONS = HERE / "data" / "icons"
-NEEDED = [f"ai-usage-{k}-symbolic" for k in ("claude", "codex", "openrouter", "deepseek")]
-NEEDED.append("dev.cividati.AIUsage")
+NEEDED = [f"ammeter-{key}-symbolic" for key in ("claude", "codex", "openrouter", "deepseek")]
+NEEDED.append("dev.cividati.Ammeter")
 
 fails = 0
 for f in sorted(ICONS.glob("*.svg")):

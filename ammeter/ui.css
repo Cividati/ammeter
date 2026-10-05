@@ -1,0 +1,24 @@
+/* Ammeter - libadwaita styling.
+   {claude} {codex} {openrouter} {deepseek} {ok} {warn} {crit} are substituted from the palette in
+   ammeter/__init__.py, so colours are defined in exactly one place. */
+
+.badge {
+  border-radius: 999px;
+  min-width: 16px;
+  min-height: 16px;
+  padding: 5px;
+  color: #ffffff;            /* symbolic icons are recoloured to the CSS colour */
+}
+
+.badge.claude     { background-color: {claude}; }
+.badge.codex      { background-color: {codex}; }
+.badge.openrouter { background-color: {openrouter}; }
+.badge.deepseek   { background-color: {deepseek}; }
+
+progressbar.quota { min-width: 110px; }
+progressbar.quota progress       { background-color: {ok}; }
+progressbar.quota.warn progress  { background-color: {warn}; }
+progressbar.quota.crit progress  { background-color: {crit}; }
+
+/* money and percentages read better with fixed-width digits */
+.amount, .pct { font-family: "DejaVu Sans Mono", monospace; font-size: 13px; }

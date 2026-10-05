@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Ammeter launcher.
+
+Thin on purpose: it only makes the package importable when this file is symlinked into ~/.local/bin
+(where the GNOME extension and the desktop entry call it from), then hands over to ammeter.cli.
+
+    ln -sfn ~/Development/ammeter/bin/ammeter ~/.local/bin/ammeter
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from ammeter.cli import main  # noqa: E402
+
+if __name__ == "__main__":
+    raise SystemExit(main())

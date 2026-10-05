@@ -4,7 +4,10 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import System from 'system';
 
-const EXT = '/home/rubens/Development/agents-usage/gnome-extension';
+const EXT = `${GLib.path_get_dirname(GLib.path_get_dirname(
+    GLib.filename_from_uri(import.meta.url)[0]))}/gnome-extension`;
+const AMMETER = `${GLib.path_get_dirname(GLib.path_get_dirname(
+    GLib.filename_from_uri(import.meta.url)[0]))}/bin/ammeter`;
 const { renderLines, bar, esc } = await import(`file://${EXT}/format.js`);
 
 let fails = 0;
@@ -22,7 +25,7 @@ ok(bar(55).length === 10 && bar(-3) === bar(0), 'bar width clamped');
 ok(esc('a<b>&"c"') === 'a&lt;b&gt;&amp;"c"', `esc: ${esc('a<b>&"c"')}`);
 
 // real subprocess, same call shape the extension uses
-const proc = Gio.Subprocess.new(['/home/rubens/.local/bin/ai-usage', '--json'],
+const proc = Gio.Subprocess.new([AMMETER, '--json'],
     Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
 const res = proc.communicate_utf8(null, null);
 print(`communicate_utf8() -> ${Array.isArray(res) ? 'array of ' + res.length : typeof res}`);
@@ -34,7 +37,7 @@ ok(data.some(d => d.key === 'deepseek'), 'deepseek present');
 
 // the extension uses the async form: confirm the tuple shape so the destructuring is right
 Gio._promisify(Gio.Subprocess.prototype, 'communicate_utf8_async', 'communicate_utf8_finish');
-const proc2 = Gio.Subprocess.new(['/home/rubens/.local/bin/ai-usage', '--json'],
+const proc2 = Gio.Subprocess.new([AMMETER, '--json'],
     Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
 const ares = await proc2.communicate_utf8_async(null, null);
 print(`promisified async -> array of ${ares.length}: [${ares.map(x => typeof x).join(', ')}]`);

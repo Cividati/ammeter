@@ -26,6 +26,6 @@ for key, slug in SLUG.items():
     if not paths:
         raise SystemExit(f"no path data in {url}")
     inner = "".join(f'<path fill="#ffffff" d="{p}"/>' for p in paths)
-    out = OUT / f"ai-usage-{key}-symbolic.svg"
+    out = OUT / f"ammeter-{key}-symbolic.svg"
     out.write_text(TEMPLATE % (slug, url, INNER % inner))
     print(f"{out.name:36} {len(inner):5} bytes of path data  <- {url}")

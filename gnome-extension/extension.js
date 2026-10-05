@@ -1,5 +1,5 @@
-// AI Usage — top-bar indicator for Claude Code / Codex / OpenRouter usage.
-// All data comes from `ai-usage --json` (see ~/.local/bin/ai-usage); this file only renders it.
+// Ammeter - top-bar indicator for Claude Code / Codex / OpenRouter / DeepSeek.
+// Every number comes from `ammeter --json`; this file only renders it.
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
@@ -10,21 +10,22 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import { renderLines } from './format.js';
 
-const SCRIPT = '/home/rubens/.local/bin/ai-usage';
+// Point this at the launcher of your checkout (~/Development/ammeter/bin/ammeter).
+const SCRIPT = '/home/rubens/.local/bin/ammeter';
 const INTERVAL_S = 120;
 const ICON_OK = 'speedometer-symbolic';
 const ICON_ALERT = 'dialog-warning-symbolic';
 
-export default class AiUsageExtension extends Extension {
+export default class AmmeterExtension extends Extension {
     enable() {
         this._theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
         this._css = this.dir.get_child('stylesheet.css');
         this._theme.load_stylesheet(this._css);
 
-        this._icon = new St.Icon({ icon_name: ICON_OK, style_class: 'system-status-icon ai-usage-ok' });
-        this._button = new PanelMenu.Button(0.5, 'AI Usage', false);
+        this._icon = new St.Icon({ icon_name: ICON_OK, style_class: 'system-status-icon ammeter-ok' });
+        this._button = new PanelMenu.Button(0.5, 'Ammeter', false);
         this._button.add_child(this._icon);
-        Main.panel.addToStatusArea('ai-usage', this._button, 0, 'right');
+        Main.panel.addToStatusArea('ammeter', this._button, 0, 'right');
 
         this._menu = this._button.menu;
         this._menu.removeAll();
@@ -74,14 +75,14 @@ export default class AiUsageExtension extends Extension {
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
             const [stdout] = await proc.communicate_utf8_async(null, null);
             if (!proc.get_successful()) {
-                this._status.label.text = 'ai-usage failed to run';
+                this._status.label.text = 'ammeter failed to run';
                 return;
             }
             this._render(JSON.parse(stdout));
         } catch (e) {
-            logError(e, 'ai-usage');
+            logError(e, 'ammeter');
             if (this._status)
-                this._status.label.text = 'ai-usage error: ' + e.message;
+                this._status.label.text = 'ammeter error: ' + e.message;
         } finally {
             this._busy = false;
         }
@@ -91,15 +92,16 @@ export default class AiUsageExtension extends Extension {
         this._section.removeAll();
         const { blocks, worst, alert } = renderLines(data);
 
-        for (const b of blocks) {
+        for (const block of blocks) {
             const item = new PopupMenu.PopupMenuItem('', { reactive: false });
-            item.label.add_style_class_name('ai-usage-row');
-            item.label.clutter_text.set_markup(b.markup);
+            item.label.add_style_class_name('ammeter-row');
+            item.label.clutter_text.set_markup(block.markup);
             this._section.addMenuItem(item);
         }
 
         this._icon.icon_name = alert ? ICON_ALERT : ICON_OK;
-        this._icon.style_class = 'system-status-icon ' + (alert ? 'ai-usage-crit' : worst >= 70 ? 'ai-usage-warn' : 'ai-usage-ok');
-        this._status.setLabel('updated ' + new Date().toLocaleTimeString() + ` \u00b7 every ${INTERVAL_S}s`);
+        this._icon.style_class = 'system-status-icon ' +
+            (alert ? 'ammeter-crit' : worst >= 70 ? 'ammeter-warn' : 'ammeter-ok');
+        this._status.label.text = `updated ${new Date().toLocaleTimeString()} \u00b7 every ${INTERVAL_S}s`;
     }
 }
