@@ -35,7 +35,7 @@ PANEL = "#14141d"
 LINE = "#23232f"
 DIM = "#7a7a8c"
 FG = "#e6e6f0"
-ACCENT = {"claude": "#d97757", "codex": "#10a37f", "openrouter": "#c9a227", "deepseek": "#5b7cfa"}
+ACCENT = {"claude": "#d97757", "codex": "#412991", "openrouter": "#2dbe7f", "deepseek": "#4d6bfe"}
 ICONS = {"claude": "\u2733", "codex": "\u25c6", "openrouter": "\u21c4", "deepseek": "\u25c9"}
 NAME = {"claude": "CLAUDE", "codex": "CODEX", "openrouter": "OPENROUTER", "deepseek": "DEEPSEEK"}
 

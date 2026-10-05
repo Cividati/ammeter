@@ -3,9 +3,9 @@
 
 export const COLOR = {
     claude: '#d97757',
-    codex: '#10a37f',
-    openrouter: '#c9a227',
-    deepseek: '#5b7cfa',
+    codex: '#412991',
+    openrouter: '#2dbe7f',
+    deepseek: '#4d6bfe',
     dim: '#9a9aa8',
     text: '#e6e6f0',
     crit: '#ff5555',

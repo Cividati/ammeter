@@ -11,6 +11,7 @@ import os
 import sys
 import threading
 from datetime import datetime
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import ai_usage as core  # noqa: E402
@@ -23,17 +24,22 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 APP_ID = "dev.cividati.AIUsage"
 TITLE = "AI Usage"
+ICONS_DIR = Path(__file__).resolve().parent / "data" / "icons"
 
-# provider accents match the tk front-end and the GNOME extension
-ACCENT = {"claude": "#d97757", "codex": "#10a37f", "openrouter": "#c9a227", "deepseek": "#5b7cfa"}
-MARK = {"claude": "\u2733", "codex": "\u25c6", "openrouter": "\u21c4", "deepseek": "\u25c9"}
+# provider accents: Claude coral and OpenAI purple from simple-icons, OpenRouter green, DeepSeek blue
+ACCENT = {"claude": "#d97757", "codex": "#412991", "openrouter": "#2dbe7f", "deepseek": "#4d6bfe"}
+
+
+def provider_icon(key):
+    """Shipped symbolic svg: the badge must not depend on a font having the glyph."""
+    return f"ai-usage-{key}-symbolic"
+
 
 CSS = """
 .badge {
   border-radius: 999px;
-  min-width: 26px; min-height: 26px;
-  font-family: "DejaVu Sans";
-  font-size: 13px;
+  min-width: 16px; min-height: 16px;
+  padding: 5px;
   color: #ffffff;
 }
 %s
@@ -160,7 +166,8 @@ class UsageWindow(Adw.ApplicationWindow):
 
     def _row(self, key, r, pct):
         row = Adw.ActionRow(title=r["label"], subtitle_lines=2)
-        badge = Gtk.Label(label=MARK.get(key, "\u25cf"), valign=Gtk.Align.CENTER)
+        badge = Gtk.Image.new_from_icon_name(provider_icon(key))
+        badge.set_valign(Gtk.Align.CENTER)
         badge.add_css_class("badge")
         badge.add_css_class(key)
         row.add_prefix(badge)
@@ -189,7 +196,7 @@ class UsageWindow(Adw.ApplicationWindow):
     def about(self):
         Adw.AboutDialog(
             application_name=TITLE,
-            application_icon="utilities-system-monitor-symbolic",
+            application_icon=APP_ID,
             version="0.2",
             developer_name="Rubens Cividati",
             comments="Claude Code, Codex, OpenRouter and DeepSeek usage and balances.\n"
@@ -199,12 +206,19 @@ class UsageWindow(Adw.ApplicationWindow):
 
 
 def run():
-    app = Adw.Application(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+    flags = Gio.ApplicationFlags.DEFAULT_FLAGS
+    if not os.environ.get("DBUS_SESSION_BUS_ADDRESS"):
+        # no session bus (headless/xvfb): a unique GApplication cannot register and would exit
+        flags = Gio.ApplicationFlags.NON_UNIQUE
+    app = Adw.Application(application_id=APP_ID, flags=flags)
 
     def on_activate(_app):
+        display = Gdk.Display.get_default()
+        Gtk.IconTheme.get_for_display(display).add_search_path(str(ICONS_DIR))
+        Gtk.Window.set_default_icon_name(APP_ID)
         provider = Gtk.CssProvider()
         provider.load_from_string(CSS)
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+        Gtk.StyleContext.add_provider_for_display(display, provider,
                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         UsageWindow(_app).present()
 
