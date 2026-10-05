@@ -160,7 +160,11 @@ class UsageWindow(Adw.ApplicationWindow):
         box.append(progress)
         box.append(label)
         widget.add_suffix(box)
-        widget.set_subtitle(row["note"] or "")
+        # a long reset note wraps mid-phrase; break it where the countdown starts instead
+        note = row["note"] or ""
+        if len(note) > 27:
+            note = note.replace(" \u00b7 ", "\n\u00b7 ", 1)
+        widget.set_subtitle(note)
         return widget
 
     def about(self):
