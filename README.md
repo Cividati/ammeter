@@ -12,7 +12,10 @@ Nothing is uploaded anywhere, and no extra account or API key beyond the provide
 ## Layout
 
 ```
-ai-usage                    the data + window app (stdlib Python, no dependencies)
+ai_usage.py                 the data layer + CLI (stdlib only): fetchers, bars, cache, selftest
+ai-usage                    symlink to ai_usage.py — the stable command name everything calls
+ai_usage_gtk.py             GTK4 + libadwaita app (the default front-end)
+data/*.desktop              launcher entry so it shows up in the app grid / dock
 gnome-extension/
   metadata.json             uuid: ai-usage@cividati
   extension.js              PanelMenu button, 120s timer, Gio.Subprocess -> ai-usage --json
@@ -27,12 +30,18 @@ tests/
 ## Usage
 
 ```sh
-ai-usage                     # floating window
-ai-usage --framed            # same window with normal WM decorations (debug/screenshot aid)
+ai-usage                     # native GTK4/libadwaita app
+ai-usage --float             # the older frameless always-on-top tkinter window
+ai-usage --framed            # that window with normal WM decorations (debug/screenshot aid)
 ai-usage --text              # print to stdout and exit
 ai-usage --json              # machine-readable, this is what the GNOME extension consumes
-ai-usage --selftest          # bar widths, reset formatting, stale fallback
+ai-usage --selftest          # bars, reset formatting, window expiry, stale + disk-cache fallback
 ```
+
+The GTK app is launched with `/usr/bin/python3`, which is where PyGObject, `Gtk-4.0` and `Adw-1.0`
+are installed here; the data layer is stdlib-only, so the CLI and the extension work on any
+interpreter. `ai-usage` execs the GTK script (`os.execv`, no second process, no duplicated module
+state) and falls back to the tkinter window if GTK is unavailable.
 
 ## How it is wired in
 
@@ -41,6 +50,9 @@ immediately and there is nothing to re-copy.
 
 ```sh
 ln -sfn ~/Development/agents-usage/ai-usage ~/.local/bin/ai-usage
+ln -sfn ~/Development/agents-usage/ai_usage_gtk.py ~/.local/bin/ai-usage-gtk
+ln -sfn ~/Development/agents-usage/data/dev.cividati.AIUsage.desktop \
+        ~/.local/share/applications/dev.cividati.AIUsage.desktop
 ln -sfn ~/Development/agents-usage/gnome-extension \
         ~/.local/share/gnome-shell/extensions/ai-usage@cividati
 gsettings get org.gnome.shell enabled-extensions   # must contain ai-usage@cividati
@@ -77,6 +89,22 @@ Adding a provider = one `fetch_<name>()` returning
 and icon entry (`ACCENT`/`ICONS` in `ai-usage`, `COLOR`/`ICON` in `format.js`).
 
 ## Pitfalls found the hard way
+
+- **GTK4 cannot be an always-on-top widget on Wayland.** There is no keep-above API and no
+  borderless-client protocol the compositor will honour, so the GTK app is a normal decorated
+  window with a headerbar-in-a-ToolbarView layout. The frameless floating window survives as
+  `ai-usage --float` (tkinter, XWayland) for anyone who wants it pinned over other windows.
+- **PyGObject lives on the system interpreter only.** Here `/usr/bin/python3` (3.14.4) has
+  `gi 3.56.2`, `Gtk 4.22`, `Adw 1.9`, while other interpreters on `PATH` have no `gi` at all. The
+  GTK front-end therefore hard-codes `/usr/bin/python3` as its launcher and is exec'd from
+  `ai-usage`; the data layer stays stdlib-only so nothing else inherits that dependency.
+- **Headless screenshots of a GTK4 app** need `GDK_BACKEND=x11` (or the window lands on the real
+  session), `GSK_RENDERER=cairo` (Xvfb has no DRI3, so GL/Vulkan fallbacks spew `libEGL warning`),
+  and `xvfb-run`; `scripts/grab-x11.py` then captures it like any X client.
+- **`Adw.PreferencesPage` scrolls and clamps itself** — do not wrap it in an `Adw.Clamp` or a
+  `Gtk.ScrolledWindow`, or the inner scroller loses its height allocation. Swap a freshly built page
+  in with `Adw.ToolbarView.set_content()` to rebuild, and `Adw.ActionRow.set_subtitle_lines(2)` for
+  notes that wrap.
 
 - **Claude's usage endpoint rate-limits hard.** Rapid polling returns `HTTP 429 Too Many Requests`
   with no `Retry-After`; it cleared in roughly 2–3 minutes here. Two layers of last-good cache cover
