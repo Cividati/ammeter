@@ -44,7 +44,7 @@ def load_stylesheet():
 
 class UsageWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title=APP_NAME, default_width=520, default_height=880)
+        super().__init__(application=app, title=APP_NAME, default_width=520, default_height=800)
         self._busy = False
 
         self.spinner = Adw.Spinner(visible=False, valign=Gtk.Align.CENTER)
@@ -156,7 +156,7 @@ class UsageWindow(Adw.ApplicationWindow):
             progress.add_css_class(level)
         label = Gtk.Label(label=used_label(pct), valign=Gtk.Align.CENTER, xalign=1.0, width_chars=9)
         label.add_css_class("pct")
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         box.append(progress)
         box.append(label)
         widget.add_suffix(box)

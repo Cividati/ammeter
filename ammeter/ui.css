@@ -15,7 +15,7 @@
 .badge.openrouter { background-color: {openrouter}; }
 .badge.deepseek   { background-color: {deepseek}; }
 
-progressbar.quota { min-width: 110px; }
+progressbar.quota { min-width: 92px; }
 progressbar.quota progress       { background-color: {ok}; }
 progressbar.quota.warn progress  { background-color: {warn}; }
 progressbar.quota.crit progress  { background-color: {crit}; }
