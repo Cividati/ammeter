@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import APP_ID, APP_NAME, COLOURS, ICON_NAMES, REFRESH_SECONDS, STATUS, __version__
 from .core import collect, live_providers, problems
-from .formatting import severity
+from .formatting import severity, used_label
 
 import gi
 
@@ -154,7 +154,7 @@ class UsageWindow(Adw.ApplicationWindow):
         level = severity(pct)
         if level:
             progress.add_css_class(level)
-        label = Gtk.Label(label=f"{int(pct)}%", valign=Gtk.Align.CENTER, xalign=1.0, width_chars=4)
+        label = Gtk.Label(label=used_label(pct), valign=Gtk.Align.CENTER, xalign=1.0, width_chars=9)
         label.add_css_class("pct")
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         box.append(progress)

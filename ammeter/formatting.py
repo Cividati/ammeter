@@ -77,6 +77,15 @@ def quota_row(label, pct, resets_at=None):
             "note": reset_note(iso=resets_at)}
 
 
+def used_label(pct):
+    """Spell out that a percentage is consumption, not what is left.
+
+    A bare '33%' next to a bar is read both ways; the bar fills up as the quota is consumed, so say
+    'used' and let the balance rows carry the money instead.
+    """
+    return f"{int(pct)}% used"
+
+
 def balance_row(label, note):
     """A row carrying money instead of a quota: no bar, so no percentage."""
     return {"label": label, "pct": None, "note": note}

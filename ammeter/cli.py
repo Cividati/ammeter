@@ -25,6 +25,7 @@ from .formatting import (
     parse_dt,
     relative_reset,
     reset_note,
+    used_label,
 )
 
 REPO = Path(__file__).resolve().parent.parent
@@ -44,8 +45,11 @@ def render_text(data):
         if entry.get("error"):
             lines.append(f"     ! {entry['error']}")
         for row in entry["rows"]:
-            value = "" if row["pct"] is None else f"{row['pct']:>3}%  " + bar(row["pct"])
-            lines.append(f"     {row['label']:<9}{value:<{BAR_WIDTH + 7}}{row['note']}")
+            if row["pct"] is None:
+                lines.append(f"     {row['label']:<9}{row['note']}")
+            else:
+                lines.append(f"     {row['label']:<9}{used_label(row['pct']):>9}  "
+                             f"{bar(row['pct'])}  {row['note']}")
     return "\n".join(lines)
 
 
@@ -54,6 +58,8 @@ def selftest():
     assert len(bar(0)) == BAR_WIDTH and bar(0) == EMPTY * BAR_WIDTH
     assert bar(100) == FILLED * BAR_WIDTH and bar(50).count(FILLED) == BAR_WIDTH // 2
     assert bar(-5) == EMPTY * BAR_WIDTH and bar(999) == FILLED * BAR_WIDTH
+    assert used_label(25) == "25% used", "a bare percentage is read both ways"
+    assert used_label(100.4) == "100% used"
 
     far = "2030-01-02T03:04:00+00:00"
     assert "02 Jan 2030" in absolute_reset(iso=far), "a reset days away must show its date"

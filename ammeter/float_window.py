@@ -11,7 +11,7 @@ from datetime import datetime
 
 from . import COLOURS, MARKS, REFRESH_SECONDS, STATUS
 from .core import collect
-from .formatting import bar, severity
+from .formatting import bar, severity, used_label
 
 BACKGROUND = "#0b0b11"
 RULE = "#23232f"
@@ -110,7 +110,7 @@ def run(data, refresh_seconds=REFRESH_SECONDS, framed=False):
                     tk.Label(body, text=bar(pct), bg=BACKGROUND, width=BAR_CELLS, anchor="w",
                              fg=value_colour(pct, accent), font=(MONO, 10)).grid(
                         row=line, column=2, sticky="w")
-                    tk.Label(body, text=f"{int(pct):>3}%   {row['note']}", bg=BACKGROUND,
+                    tk.Label(body, text=f"{used_label(pct):>9}   {row['note']}", bg=BACKGROUND,
                              fg=FOREGROUND, font=(MONO, 10), anchor="w").grid(
                         row=line, column=3, sticky="w", padx=(4, 14))
                 line += 1

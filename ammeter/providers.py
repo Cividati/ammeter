@@ -113,7 +113,8 @@ def deepseek():
         rows.append(balance_row("balance", note))
     if not rows:
         rows.append(balance_row("balance", "no balance reported"))
-    return {"name": "DEEPSEEK", "sub": "available" if data.get("is_available") else "unavailable",
+    # "available" is noise in the header; only speak up when the account cannot be used
+    return {"name": "DEEPSEEK", "sub": "" if data.get("is_available") else "unavailable",
             "rows": rows}
 
 

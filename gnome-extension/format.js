@@ -51,7 +51,7 @@ export function renderLines(data) {
                     worst = Math.max(worst, pct);
                     lines.push(`<span foreground="${COLOR.dim}">${esc(r.label.padEnd(8))}</span>`
                         + `<span foreground="${pct >= 90 ? COLOR.crit : COLOR[d.key] ?? COLOR.text}">${bar(pct)}</span>`
-                        + ` ${String(pct).padStart(3)}%  ${esc(r.note)}`);
+                        + ` ${pct}% used  ${esc(r.note)}`);
                 }
             }
         }

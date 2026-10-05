@@ -36,6 +36,10 @@ countdowns, plus the prepaid balances that quietly run dry.
 Quota providers get a bar that turns amber at 70% and red at 90%; pay-as-you-go providers get their
 balance, because a percentage of a top-up you can refill is not the same thing as a quota you cannot.
 
+Numbers are never ambiguous about direction: every percentage is **consumption**, and reads
+`33% used` — the bar fills as the quota is spent, so nothing has to be inferred from a bare `33%`.
+The prepaid providers report money instead of a percentage for the same reason.
+
 ## Install
 
 Requirements: a Linux desktop with Python 3.10+; PyGObject with `Gtk-4.0` and `Adw-1.0` for the app
@@ -67,15 +71,15 @@ ammeter --version
 
 ```
 ✳  CLAUDE  (pro)
-     5h        25%  ▓▓▓░░░░░░░░░ resets 14:20 · in 2h17m
-     7d        73%  ▓▓▓▓▓▓▓▓▓░░░ resets Wed 07 Oct 20:00 · in 2d7h
+     5h        33% used  ▓▓▓▓░░░░░░░░  resets 14:20 · in 2h07m
+     7d        74% used  ▓▓▓▓▓▓▓▓▓░░░  resets Wed 07 Oct 20:00 · in 2d7h
 ◆  CODEX  (go)
-     session  100%  ▓▓▓▓▓▓▓▓▓▓▓▓ resets Mon 02 Nov 14:33 · in 28d3h
+     session  100% used  ▓▓▓▓▓▓▓▓▓▓▓▓  resets Mon 02 Nov 14:33 · in 28d3h
 ⇄  OPENROUTER
-     balance                     $7.92 left of $60.00
-     spend                       $0.00 today   $2.09 month
-◉  DEEPSEEK  (available)
-     balance                     USD 3.39
+     balance  $7.92 left of $60.00
+     spend    $0.00 today   $2.09 month
+◉  DEEPSEEK
+     balance  USD 3.26
 
 4/4 providers · Ammeter 0.3.0 · refreshed every 120s
 ```
