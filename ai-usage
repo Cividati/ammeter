@@ -54,21 +54,97 @@ def _get(url, headers, timeout=20):
         return json.loads(r.read().decode())
 
 
-def _when(iso=None, epoch=None):
-    """Human reset time: 14:20 if today, else Wed 19:00; None if unknown."""
+def _dt(iso=None, epoch=None):
+    """Parse an ISO string or a unix timestamp into an aware datetime; None if unusable."""
     try:
-        dt = datetime.fromtimestamp(epoch, timezone.utc) if epoch else datetime.fromisoformat(iso)
-        local = dt.astimezone()
+        d = datetime.fromtimestamp(epoch, timezone.utc) if epoch else datetime.fromisoformat(iso)
     except Exception:
         return None
-    now = datetime.now().astimezone()
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def _iso(epoch=None):
+    d = _dt(epoch=epoch)
+    return d.isoformat() if d else None
+
+
+def _when(iso=None, epoch=None):
+    """Absolute reset time: 14:20 if today, else Wed 07 Oct 19:59 (year only if it differs)."""
+    d = _dt(iso, epoch)
+    if not d:
+        return None
+    local, now = d.astimezone(), datetime.now().astimezone()
     if local.date() == now.date():
         return local.strftime("%H:%M")
-    return local.strftime("%a %H:%M")
+    return local.strftime("%a %d %b %H:%M" if local.year == now.year else "%a %d %b %Y %H:%M")
 
 
-def _pct_row(label, pct, note):
-    return {"label": label, "pct": round(float(pct)), "note": note}
+def _in(iso=None, epoch=None):
+    """Relative reset time: 'in 28d3h', 'in 2h33m', 'in 4m'; None if unknown."""
+    d = _dt(iso, epoch)
+    if not d:
+        return None
+    secs = int((d - datetime.now(timezone.utc)).total_seconds())
+    if secs <= 0:
+        return "now"
+    days, rest = divmod(secs, 86400)
+    hours, mins = divmod(rest // 60, 60)
+    if days:
+        return f"in {days}d{hours}h"
+    return f"in {hours}h{mins:02d}m" if hours else f"in {mins}m"
+
+
+def _reset_note(iso=None, epoch=None):
+    """When a quota window resets, absolute and relative, e.g. 'resets Wed 07 Oct 19:59 - in 2d5h'."""
+    when, rel = _when(iso, epoch), _in(iso, epoch)
+    if not when:
+        return ""
+    return f"resets {when} \u00b7 {rel}" if rel else f"resets {when}"
+
+
+def _pct_row(label, pct, resets_at=None, prefix=""):
+    return {"label": label, "pct": round(float(pct)), "reset": resets_at,
+            "note": (f"{prefix} \u00b7 " if prefix else "") + _reset_note(iso=resets_at)}
+
+
+def _err_text(e):
+    """Short, non-alarming name for a fetch failure."""
+    if isinstance(e, urllib.error.HTTPError) and e.code == 429:
+        return "rate limited (HTTP 429)"
+    if isinstance(e, urllib.error.URLError):
+        return "offline"
+    return f"{type(e).__name__}: {e}"
+
+
+CACHE_FILE = HOME / ".cache" / "ai-usage" / "last-good.json"
+
+
+def _load_cache():
+    """Last good result per provider from the previous run, so a 429 on start still shows numbers."""
+    try:
+        return json.loads(CACHE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_cache(cache):
+    try:
+        CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CACHE_FILE.write_text(json.dumps(cache))
+    except Exception:
+        pass
+
+
+def _expire(d):
+    """A window that already rolled over makes its old number meaningless: drop the bar and say so."""
+    now = datetime.now(timezone.utc)
+    for row in d.get("rows") or []:
+        if row.get("pct") is None:
+            continue
+        rolled = _dt(row.get("reset"))
+        if rolled and rolled <= now:
+            row["pct"] = None
+            row["note"] = f"window reset {_when(iso=row['reset'])} \u2014 awaiting fresh numbers"
 
 
 def fetch_claude():
@@ -83,15 +159,11 @@ def fetch_claude():
               "Accept": "application/json"})
     sub = (cred.get("claudeAiOauth") or {}).get("subscriptionType") or ""
     rows = []
-    for key, label in (("five_hour", "5h"), ("seven_day", "7d")):
+    for key, label in (("five_hour", "5h"), ("seven_day", "7d"),
+                       ("seven_day_opus", "opus 7d"), ("seven_day_sonnet", "sonnet 7d")):
         v = j.get(key) or {}
         if v.get("utilization") is not None:
-            rows.append(_pct_row(label, v["utilization"], f"reset {_when(iso=v.get('resets_at')) or '-'}"))
-    # per-model weekly buckets, only when the account actually has them
-    for key, label in (("seven_day_opus", "opus 7d"), ("seven_day_sonnet", "sonnet 7d")):
-        v = j.get(key) or {}
-        if v.get("utilization") is not None:
-            rows.append(_pct_row(label, v["utilization"], f"reset {_when(iso=v.get('resets_at')) or '-'}"))
+            rows.append(_pct_row(label, v["utilization"], v.get("resets_at")))
     return {"name": "CLAUDE", "rows": rows, "sub": sub}
 
 
@@ -110,12 +182,11 @@ def fetch_codex():
         w = rl.get(win) or {}
         if w.get("used_percent") is not None:
             secs = w.get("limit_window_seconds") or 0
-            span = f"{secs // 86400}d" if secs >= 86400 else f"{secs // 3600}h"
-            rows.append(_pct_row(label, w["used_percent"],
-                                 f"{span} window, reset {_when(epoch=w.get('reset_at')) or '-'}"))
+            span = f"{secs // 86400}d window" if secs >= 86400 else f"{secs // 3600}h window"
+            rows.append(_pct_row(label, w["used_percent"], _iso(w.get("reset_at")), prefix=span))
     cr = j.get("credits") or {}
     if cr.get("balance") is not None:
-        rows.append({"label": "credits", "pct": None, "note": f"${cr['balance']}"})
+        rows.append({"label": "balance", "pct": None, "note": f"${cr['balance']}"})
     return {"name": "CODEX", "rows": rows, "sub": j.get("plan_type") or "",
             "reached": bool(rl.get("limit_reached"))}
 
@@ -165,23 +236,29 @@ def fetch_deepseek():
 FETCHERS = (("claude", fetch_claude), ("codex", fetch_codex),
             ("openrouter", fetch_openrouter), ("deepseek", fetch_deepseek))
 
-_LAST = {}  # last good result per provider; the Claude usage endpoint 429s if polled too hard
+_LAST = {}  # last good result per provider, this process; the Claude endpoint 429s if polled hard
 
 
 def collect():
+    disk = _load_cache()
     out = []
     for key, fn in FETCHERS:
         try:
             d = fn()
             _LAST[key] = d
+            if key in NAME:
+                disk[key] = d
         except Exception as e:
-            prev = _LAST.get(key)
+            prev = _LAST.get(key) or disk.get(key)
             if prev:
-                d = dict(prev, stale=True)
+                d = dict(prev, stale=True, why=_err_text(e))
             else:
-                d = {"name": key.upper(), "rows": [], "sub": "", "error": f"{type(e).__name__}: {e}"}
+                d = {"name": NAME.get(key, key.upper()), "rows": [], "sub": "",
+                     "error": _err_text(e)}
         d["key"] = key
+        _expire(d)
         out.append(d)
+    _save_cache(disk)
     return out
 
 
@@ -193,7 +270,7 @@ def render_text(data):
         if d.get("sub"):
             head += f"  ({d['sub']})"
         if d.get("stale"):
-            head += "  [stale]"
+            head += "  [stale" + (f": {d['why']}" if d.get("why") else "") + "]"
         lines.append(head)
         if d.get("error"):
             lines.append(f"     ! {d['error']}")
@@ -263,7 +340,8 @@ def build_gui(data, refresh_s=REFRESH_S, framed=False):
             hbox = tk.Frame(body, bg=BG)
             hbox.grid(row=r, column=1, columnspan=3, sticky="w", pady=(5, 0))
             tk.Label(hbox, text=d["name"], bg=BG, fg=color, font=(MONO, 11, "bold")).pack(side="left")
-            tag = (d.get("sub") or "") + ("   \u2014 stale" if stale else "")
+            tag = (d.get("sub") or "") + ("   \u2014 stale" + (f" ({d['why']})" if d.get("why") else "")
+                                          if stale else "")
             if tag:
                 tk.Label(hbox, text=tag, bg=BG, fg="#f9c74f" if stale else DIM,
                          font=(MONO, 9)).pack(side="left", padx=(9, 0))
@@ -353,28 +431,55 @@ def build_gui(data, refresh_s=REFRESH_S, framed=False):
 
 
 def selftest():
-    """Minimal runnable check: bar widths, reset formatting, stale fallback."""
+    """Runnable checks: bar widths, reset formatting, window expiry, stale + disk-cache fallback."""
     assert len(bar(0)) == BAR_W and bar(0) == EMPTY * BAR_W
     assert bar(100) == FILLED * BAR_W and bar(50).count(FILLED) == BAR_W // 2
     assert bar(-5) == EMPTY * BAR_W and bar(999) == FILLED * BAR_W
-    assert _when(epoch=int(time.time()) + 3600) is not None
-    assert _when(iso="not-a-date") is None and _when() is None
-    ok = {"rows": [{"label": "5h", "pct": 18, "note": "n"}], "name": "X", "sub": ""}
+
+    far = "2030-01-02T03:04:00+00:00"
+    assert "02 Jan 2030" in _when(iso=far), "a reset days away must show its date"
+    assert _in(iso=far).startswith("in ") and _in(epoch=1) == "now"
+    assert _reset_note(iso=far).startswith("resets ") and _reset_note(None) == ""
+    assert _when(iso="not-a-date") is None and _when() is None and _in(iso="nope") is None
+    assert _err_text(urllib.error.HTTPError("u", 429, "Too Many Requests", {}, None)) == \
+        "rate limited (HTTP 429)"
+    assert _err_text(RuntimeError("nope")) == "RuntimeError: nope"
+
+    # a window that already rolled over loses its bar instead of showing a stale percentage
+    rolled = {"label": "5h", "pct": 40, "reset": "2020-01-01T00:00:00+00:00", "note": "x"}
+    holder = {"rows": [rolled]}
+    _expire(holder)
+    assert rolled["pct"] is None and "awaiting fresh numbers" in rolled["note"]
+    fresh = _pct_row("5h", 12, _iso(int(time.time()) + 3600))
+    assert fresh["pct"] == 12 and "resets" in fresh["note"]
+
+    ok = {"rows": [{"label": "5h", "pct": 18, "note": "n", "reset": far}], "name": "X", "sub": ""}
     boom = lambda: (_ for _ in ()).throw(RuntimeError("429"))
-    global FETCHERS
-    saved = FETCHERS
-    FETCHERS = (("x", lambda: ok), ("y", boom))
+
+    global FETCHERS, CACHE_FILE
+    saved_fetchers, saved_cache = FETCHERS, CACHE_FILE
+    import tempfile
+    CACHE_FILE = Path(tempfile.mkdtemp(prefix="ai-usage-selftest-")) / "last-good.json"
     try:
+        FETCHERS = (("claude", lambda: ok), ("codex", boom))
         _LAST.clear()
         first = collect()
-        assert first[1]["error"], "first failure should report an error"
-        second = collect()          # still failing, still no cached rows for y
-        third = collect()
-        assert second[0]["rows"] == third[0]["rows"] == ok["rows"]
-        _LAST["y"] = ok             # now simulate y having succeeded once
-        assert collect()[1]["rows"] == ok["rows"] and collect()[1]["stale"] is True
+        assert first[0]["rows"] == ok["rows"], "a good fetch keeps its rows"
+        assert first[1]["error"], "a failure with nothing cached must report an error"
+
+        # disk cache stands in for a fresh process: memory cleared, provider now fails
+        _LAST.clear()
+        FETCHERS = (("claude", boom),)
+        again = collect()[0]
+        assert again["rows"] == ok["rows"], "the disk cache should restore the last good rows"
+        assert again["stale"] is True and again["why"] == "RuntimeError: 429"
+        assert "stale" in render_text([dict(again, name="X", key="claude")])
+
+        # a provider that never once succeeded reports the failure rather than inventing rows
+        FETCHERS = (("deepseek", boom),)
+        assert collect()[0]["error"], "no cache plus a failure must surface the error"
     finally:
-        FETCHERS = saved
+        FETCHERS, CACHE_FILE = saved_fetchers, saved_cache
         _LAST.clear()
     print("selftest ok")
 

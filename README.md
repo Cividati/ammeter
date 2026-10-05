@@ -79,9 +79,17 @@ and icon entry (`ACCENT`/`ICONS` in `ai-usage`, `COLOR`/`ICON` in `format.js`).
 ## Pitfalls found the hard way
 
 - **Claude's usage endpoint rate-limits hard.** Rapid polling returns `HTTP 429 Too Many Requests`
-  with no `Retry-After`; it cleared in roughly 2–3 minutes here. Hence a 120s interval and a
-  last-good cache: a failed poll keeps the previous numbers and marks the block `stale` instead of
-  blanking it.
+  with no `Retry-After`; it cleared in roughly 2–3 minutes here. Two layers of last-good cache cover
+  it: `_LAST` in-process, plus `~/.cache/ai-usage/last-good.json` so a 429 in a *fresh* process
+  (the one-shot `--text`, the GNOME extension's subprocess) still shows the previous numbers instead
+  of an error. Stale blocks are labelled with the reason, e.g. `— stale (rate limited (HTTP 429))`.
+- **A cached window that already rolled over is not shown as a percentage.** Every quota row carries
+  its reset timestamp, so when the reset has passed while the data was stale the bar is dropped and
+  the row reads `window reset 14:20 — awaiting fresh numbers`. Those numbers are known to be wrong;
+  showing them anyway is worse than showing nothing.
+- **Reset times are printed absolute and relative** (`resets Wed 07 Oct 20:00 · in 2d8h`), with the
+  date included whenever the reset is not today. Codex's 30-day window makes this mandatory — a bare
+  `Mon 14:33` was meaningless.
 - **The Codex usage endpoint is not a public API** (`chatgpt.com/backend-api/wham/usage`), and
   `~/.codex/auth.json` and `~/.claude/.credentials.json` are secrets — never log or commit them.
 - **GNOME Shell 50 API facts**, checked against the installed shell (`libshell-18.so` gresource):
