@@ -129,11 +129,13 @@ def fetch_openrouter():
     k = _get("https://openrouter.ai/api/v1/key", h)["data"]
     total, used = float(cred.get("total_credits") or 0), float(cred.get("total_usage") or 0)
     left = max(total - used, 0.0)
-    rows = [{"label": "credits", "pct": round(used / total * 100) if total else 0,
-             "note": f"${left:.2f} left of ${total:.2f}"}]
+    # prepaid credit, same model as DeepSeek: headline the balance, never a quota percentage
+    rows = [{"label": "balance", "pct": None,
+             "note": f"${left:.2f} left of ${total:.2f}" if total else "no credit purchased"}]
     if k.get("usage_daily") is not None:
-        rows.append({"label": "today", "pct": None,
-                     "note": f"${float(k.get('usage_daily') or 0):.2f}  month ${float(k.get('usage_monthly') or 0):.2f}"})
+        rows.append({"label": "spend", "pct": None,
+                     "note": f"${float(k.get('usage_daily') or 0):.2f} today   "
+                             f"${float(k.get('usage_monthly') or 0):.2f} month"})
     return {"name": "OPENROUTER", "rows": rows, "sub": ""}
 
 
