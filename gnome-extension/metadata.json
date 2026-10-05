@@ -1,0 +1,7 @@
+{
+  "uuid": "ai-usage@cividati",
+  "name": "AI Usage",
+  "description": "Claude Code, Codex and OpenRouter token usage, credits and quota limits in the top bar. Reads the CLI logins already on this machine via ~/.local/bin/ai-usage --json; nothing leaves the machine.",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "version": 1
+}

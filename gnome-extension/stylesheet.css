@@ -1,0 +1,4 @@
+.ai-usage-ok   { color: #8ab4f8; }
+.ai-usage-warn { color: #f9c74f; }
+.ai-usage-crit { color: #ff5555; }
+.ai-usage-row  { font-family: "DejaVu Sans Mono", monospace; font-size: 11px; }

@@ -1,0 +1,393 @@
+#!/usr/bin/env python3
+"""ai-usage - floating desktop widget: Claude Code / Codex / OpenRouter usage.
+
+Reads the logins the CLIs already store locally; nothing is uploaded anywhere.
+  ~/.claude/.credentials.json          -> api.anthropic.com/api/oauth/usage
+  ~/.codex/auth.json                   -> chatgpt.com/backend-api/wham/usage
+  ~/.hermes/.env OPENROUTER_API_KEY    -> openrouter.ai/api/v1/credits + /key
+
+Usage:
+  ai-usage            floating always-on-top widget (drag to move, right-click for menu)
+  ai-usage --text     print the same numbers to stdout and exit
+  ai-usage --json     machine-readable dump
+"""
+import json
+import queue
+import re
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+HOME = Path.home()
+REFRESH_S = 120
+BAR_W = 12
+FILLED, EMPTY = "\u2593", "\u2591"
+
+BG = "#0b0b11"
+PANEL = "#14141d"
+LINE = "#23232f"
+DIM = "#7a7a8c"
+FG = "#e6e6f0"
+ACCENT = {"claude": "#d97757", "codex": "#10a37f", "openrouter": "#c9a227", "deepseek": "#5b7cfa"}
+ICONS = {"claude": "\u2733", "codex": "\u25c6", "openrouter": "\u21c4", "deepseek": "\u25c9"}
+NAME = {"claude": "CLAUDE", "codex": "CODEX", "openrouter": "OPENROUTER", "deepseek": "DEEPSEEK"}
+
+
+def _env_key(name):
+    """Read KEY=... from ~/.hermes/.env (the file Hermes itself uses for provider keys)."""
+    env = HOME / ".hermes" / ".env"
+    if env.exists():
+        m = re.search(r'(?im)^\s*(?:export\s+)?' + name + r'\s*=\s*["\']?([^\s"\']+)',
+                      env.read_text(errors="ignore"))
+        if m:
+            return m.group(1)
+    return None
+
+
+def _get(url, headers, timeout=20):
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode())
+
+
+def _when(iso=None, epoch=None):
+    """Human reset time: 14:20 if today, else Wed 19:00; None if unknown."""
+    try:
+        dt = datetime.fromtimestamp(epoch, timezone.utc) if epoch else datetime.fromisoformat(iso)
+        local = dt.astimezone()
+    except Exception:
+        return None
+    now = datetime.now().astimezone()
+    if local.date() == now.date():
+        return local.strftime("%H:%M")
+    return local.strftime("%a %H:%M")
+
+
+def _pct_row(label, pct, note):
+    return {"label": label, "pct": round(float(pct)), "note": note}
+
+
+def fetch_claude():
+    cred = json.loads((HOME / ".claude" / ".credentials.json").read_text())
+    tok = (cred.get("claudeAiOauth") or {}).get("accessToken")
+    if not tok:
+        raise RuntimeError("no oauth token")
+    j = _get("https://api.anthropic.com/api/oauth/usage",
+             {"Authorization": f"Bearer {tok}",
+              "anthropic-beta": "oauth-2025-04-20",
+              "User-Agent": "claude-code/2.0",
+              "Accept": "application/json"})
+    sub = (cred.get("claudeAiOauth") or {}).get("subscriptionType") or ""
+    rows = []
+    for key, label in (("five_hour", "5h"), ("seven_day", "7d")):
+        v = j.get(key) or {}
+        if v.get("utilization") is not None:
+            rows.append(_pct_row(label, v["utilization"], f"reset {_when(iso=v.get('resets_at')) or '-'}"))
+    # per-model weekly buckets, only when the account actually has them
+    for key, label in (("seven_day_opus", "opus 7d"), ("seven_day_sonnet", "sonnet 7d")):
+        v = j.get(key) or {}
+        if v.get("utilization") is not None:
+            rows.append(_pct_row(label, v["utilization"], f"reset {_when(iso=v.get('resets_at')) or '-'}"))
+    return {"name": "CLAUDE", "rows": rows, "sub": sub}
+
+
+def fetch_codex():
+    auth = json.loads((HOME / ".codex" / "auth.json").read_text())
+    t = auth.get("tokens") or {}
+    tok, acct = t.get("access_token"), t.get("account_id")
+    if not (tok and acct):
+        raise RuntimeError("no codex tokens")
+    j = _get("https://chatgpt.com/backend-api/wham/usage",
+             {"Authorization": f"Bearer {tok}", "chatgpt-account-id": acct,
+              "User-Agent": "codex-cli/0.1", "Accept": "application/json"})
+    rows = []
+    rl = j.get("rate_limit") or {}
+    for win, label in (("primary_window", "session"), ("secondary_window", "weekly")):
+        w = rl.get(win) or {}
+        if w.get("used_percent") is not None:
+            secs = w.get("limit_window_seconds") or 0
+            span = f"{secs // 86400}d" if secs >= 86400 else f"{secs // 3600}h"
+            rows.append(_pct_row(label, w["used_percent"],
+                                 f"{span} window, reset {_when(epoch=w.get('reset_at')) or '-'}"))
+    cr = j.get("credits") or {}
+    if cr.get("balance") is not None:
+        rows.append({"label": "credits", "pct": None, "note": f"${cr['balance']}"})
+    return {"name": "CODEX", "rows": rows, "sub": j.get("plan_type") or "",
+            "reached": bool(rl.get("limit_reached"))}
+
+
+def fetch_openrouter():
+    key = _env_key("OPENROUTER_API_KEY")
+    if not key:
+        raise RuntimeError("no OPENROUTER_API_KEY in ~/.hermes/.env")
+    h = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
+    cred = _get("https://openrouter.ai/api/v1/credits", h)["data"]
+    k = _get("https://openrouter.ai/api/v1/key", h)["data"]
+    total, used = float(cred.get("total_credits") or 0), float(cred.get("total_usage") or 0)
+    left = max(total - used, 0.0)
+    rows = [{"label": "credits", "pct": round(used / total * 100) if total else 0,
+             "note": f"${left:.2f} left of ${total:.2f}"}]
+    if k.get("usage_daily") is not None:
+        rows.append({"label": "today", "pct": None,
+                     "note": f"${float(k.get('usage_daily') or 0):.2f}  month ${float(k.get('usage_monthly') or 0):.2f}"})
+    return {"name": "OPENROUTER", "rows": rows, "sub": ""}
+
+
+def bar(pct):
+    cells = max(0, min(BAR_W, round(pct / 100 * BAR_W)))
+    return FILLED * cells + EMPTY * (BAR_W - cells)
+
+
+def fetch_deepseek():
+    key = _env_key("DEEPSEEK_API_KEY")
+    if not key:
+        raise RuntimeError("no DEEPSEEK_API_KEY in ~/.hermes/.env")
+    j = _get("https://api.deepseek.com/user/balance",
+             {"Authorization": f"Bearer {key}", "Accept": "application/json"})
+    rows = []
+    for b in j.get("balance_infos") or []:
+        cur = b.get("currency") or ""
+        note = f"{cur} {b.get('total_balance')}".strip()
+        if float(b.get("granted_balance") or 0):
+            note += f"  (granted {b['granted_balance']})"
+        rows.append({"label": "balance", "pct": None, "note": note})
+    if not rows:
+        rows.append({"label": "balance", "pct": None, "note": "no balance reported"})
+    return {"name": "DEEPSEEK", "rows": rows, "sub": "available" if j.get("is_available") else "unavailable"}
+
+
+FETCHERS = (("claude", fetch_claude), ("codex", fetch_codex),
+            ("openrouter", fetch_openrouter), ("deepseek", fetch_deepseek))
+
+_LAST = {}  # last good result per provider; the Claude usage endpoint 429s if polled too hard
+
+
+def collect():
+    out = []
+    for key, fn in FETCHERS:
+        try:
+            d = fn()
+            _LAST[key] = d
+        except Exception as e:
+            prev = _LAST.get(key)
+            if prev:
+                d = dict(prev, stale=True)
+            else:
+                d = {"name": key.upper(), "rows": [], "sub": "", "error": f"{type(e).__name__}: {e}"}
+        d["key"] = key
+        out.append(d)
+    return out
+
+
+# ---------------------------------------------------------------- text output
+def render_text(data):
+    lines = []
+    for d in data:
+        head = ICONS.get(d.get("key"), " ") + "  " + d["name"]
+        if d.get("sub"):
+            head += f"  ({d['sub']})"
+        if d.get("stale"):
+            head += "  [stale]"
+        lines.append(head)
+        if d.get("error"):
+            lines.append(f"     ! {d['error']}")
+        for r in d["rows"]:
+            pct = "" if r["pct"] is None else f"{r['pct']:>3}%  " + bar(r["pct"])
+            lines.append(f"     {r['label']:<9}{pct:<24}{r['note']}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- tk widget
+MONO = "DejaVu Sans Mono"
+SANS = "DejaVu Sans"
+
+
+def _rule(parent, row, tk):
+    f = tk.Frame(parent, bg=LINE, height=1)
+    f.grid(row=row, column=0, sticky="we", padx=14, pady=(0, 6))
+    return f
+
+
+def build_gui(data, refresh_s=REFRESH_S, framed=False):
+    import tkinter as tk
+
+    root = tk.Tk()
+    root.title("ai-usage")
+    if not framed:
+        root.overrideredirect(True)
+        root.attributes("-topmost", True)
+    try:
+        root.attributes("-alpha", 0.96)
+    except tk.TclError:
+        pass
+    root.configure(bg=BG)
+
+    wrap = tk.Frame(root, bg=BG, highlightbackground=LINE, highlightthickness=1)
+    wrap.pack(fill="both", expand=True)
+
+    head = tk.Frame(wrap, bg=BG)
+    head.grid(row=0, column=0, sticky="we", padx=14, pady=(12, 5))
+    head.columnconfigure(2, weight=1)
+    dot = tk.Label(head, text="\u25cf", bg=BG, fg="#5b7cfa", font=(SANS, 11))
+    dot.grid(row=0, column=0, sticky="w", padx=(0, 7))
+    tk.Label(head, text="AI USAGE", bg=BG, fg=FG, font=(MONO, 11, "bold"),
+             anchor="w").grid(row=0, column=1, sticky="w")
+    clock = tk.Label(head, text=f"\u21bb {refresh_s}s", bg=BG, fg=DIM, font=(MONO, 9), anchor="e")
+    clock.grid(row=0, column=2, sticky="e")
+
+    _rule(wrap, 1, tk)
+
+    body = tk.Frame(wrap, bg=BG)
+    body.grid(row=2, column=0, sticky="we")
+
+    foot = tk.Label(wrap, text="", bg=BG, fg=DIM, font=(MONO, 9), anchor="w")
+    foot.grid(row=3, column=0, sticky="we", padx=14, pady=(10, 10))
+
+    def redraw(data):
+        for w in body.winfo_children():
+            w.destroy()
+        body.columnconfigure(0, minsize=28)
+        r, worst = 0, 0
+        for d in data:
+            key = d.get("key")
+            color = ACCENT.get(key, FG)
+            stale = bool(d.get("stale"))
+            tk.Label(body, text=ICONS.get(key, "\u25cf"), bg=BG, fg=color,
+                     font=(SANS, 15)).grid(row=r, column=0, sticky="w", padx=(14, 6), pady=(5, 0))
+            hbox = tk.Frame(body, bg=BG)
+            hbox.grid(row=r, column=1, columnspan=3, sticky="w", pady=(5, 0))
+            tk.Label(hbox, text=d["name"], bg=BG, fg=color, font=(MONO, 11, "bold")).pack(side="left")
+            tag = (d.get("sub") or "") + ("   \u2014 stale" if stale else "")
+            if tag:
+                tk.Label(hbox, text=tag, bg=BG, fg="#f9c74f" if stale else DIM,
+                         font=(MONO, 9)).pack(side="left", padx=(9, 0))
+            r += 1
+            if d.get("error") or not d["rows"]:
+                tk.Label(body, text="\u26a0 " + (d.get("error") or "no data"), bg=BG, fg="#ff6b6b",
+                         font=(MONO, 10), anchor="w").grid(
+                    row=r, column=1, columnspan=3, sticky="w", padx=(0, 14))
+                r += 2
+                continue
+            for row in d["rows"]:
+                pct = row["pct"]
+                tk.Label(body, text=row["label"], bg=BG, fg=DIM, font=(MONO, 10),
+                         anchor="w", width=9).grid(row=r, column=1, sticky="w")
+                if pct is None:
+                    tk.Label(body, text=row["note"], bg=BG, fg=FG, font=(MONO, 10), anchor="w").grid(
+                        row=r, column=2, columnspan=2, sticky="w", padx=(BAR_W + 4, 14))
+                else:
+                    worst = max(worst, int(pct))
+                    tk.Label(body, text=bar(pct), bg=BG, width=BAR_W, anchor="w",
+                             fg="#ff5555" if pct >= 90 else "#f9c74f" if pct >= 70 else color,
+                             font=(MONO, 10)).grid(row=r, column=2, sticky="w")
+                    tk.Label(body, text=f"{int(pct):>3}%   {row['note']}", bg=BG, fg=FG,
+                             font=(MONO, 10), anchor="w").grid(row=r, column=3, sticky="w", padx=(4, 14))
+                r += 1
+            r += 1
+        dot.config(fg="#ff5555" if worst >= 90 else "#f9c74f" if worst >= 70 else "#5b7cfa")
+
+    redraw(data)
+
+    # drag to move, right-click for menu / quit, Esc quits
+    drag = {}
+
+    def press(e):
+        drag["x"], drag["y"] = e.x_root - root.winfo_x(), e.y_root - root.winfo_y()
+
+    def move(e):
+        if "x" in drag:
+            root.geometry(f"+{e.x_root - drag['x']}+{e.y_root - drag['y']}")
+
+    menu = tk.Menu(root, tearoff=0)
+
+    def quit_(*_):
+        root.destroy()
+
+    menu.add_command(label="Refresh now", command=lambda: kick())
+    menu.add_command(label="Quit", command=quit_)
+
+    def bind(w):
+        w.bind("<Button-1>", press)
+        w.bind("<B1-Motion>", move)
+        w.bind("<ButtonRelease-1>", lambda e: drag.clear())
+        w.bind("<Button-3>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+        for child in w.winfo_children():
+            bind(child)
+
+    q = queue.Queue()
+
+    def worker():
+        while True:
+            q.put(collect())
+            time.sleep(refresh_s)
+
+    def kick():
+        foot.config(text="refreshing\u2026")
+        threading.Thread(target=lambda: q.put(collect()), daemon=True).start()
+
+    def poll():
+        try:
+            while True:
+                data = q.get_nowait()
+                redraw(data)
+                live = sum(1 for d in data if d["rows"])
+                foot.config(text=f"updated {datetime.now():%H:%M:%S}   \u00b7   "
+                                 f"{live}/{len(data)} providers   \u00b7   right-click for menu")
+        except queue.Empty:
+            pass
+        root.after(2000, poll)
+
+    bind(wrap)
+    root.bind("<Escape>", quit_)
+    root.geometry("+40+40")
+    root.update_idletasks()
+    threading.Thread(target=worker, daemon=True).start()
+    root.after(2000, poll)
+    root.mainloop()
+
+
+def selftest():
+    """Minimal runnable check: bar widths, reset formatting, stale fallback."""
+    assert len(bar(0)) == BAR_W and bar(0) == EMPTY * BAR_W
+    assert bar(100) == FILLED * BAR_W and bar(50).count(FILLED) == BAR_W // 2
+    assert bar(-5) == EMPTY * BAR_W and bar(999) == FILLED * BAR_W
+    assert _when(epoch=int(time.time()) + 3600) is not None
+    assert _when(iso="not-a-date") is None and _when() is None
+    ok = {"rows": [{"label": "5h", "pct": 18, "note": "n"}], "name": "X", "sub": ""}
+    boom = lambda: (_ for _ in ()).throw(RuntimeError("429"))
+    global FETCHERS
+    saved = FETCHERS
+    FETCHERS = (("x", lambda: ok), ("y", boom))
+    try:
+        _LAST.clear()
+        first = collect()
+        assert first[1]["error"], "first failure should report an error"
+        second = collect()          # still failing, still no cached rows for y
+        third = collect()
+        assert second[0]["rows"] == third[0]["rows"] == ok["rows"]
+        _LAST["y"] = ok             # now simulate y having succeeded once
+        assert collect()[1]["rows"] == ok["rows"] and collect()[1]["stale"] is True
+    finally:
+        FETCHERS = saved
+        _LAST.clear()
+    print("selftest ok")
+
+
+def main():
+    args = set(sys.argv[1:])
+    if "--selftest" in args:
+        selftest()
+        return
+    if "--text" in args or "--json" in args:
+        data = collect()
+        print(json.dumps(data, indent=2) if "--json" in args else render_text(data))
+        return
+    build_gui(collect(), framed="--framed" in args)
+
+
+if __name__ == "__main__":
+    main()
