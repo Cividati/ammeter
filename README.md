@@ -1,8 +1,10 @@
 # Token Monitor
 
 A monitor for your **GitHub Copilot premium-request quota** against its monthly budget, with local
-usage estimates from [OpenCode](https://opencode.ai). It comes as a browser dashboard (Docker or plain
-Python), a native GTK4 app, a GNOME top-bar indicator and a CLI.
+usage estimates from [OpenCode](https://opencode.ai). The **web dashboard** (Docker or plain Python) is the
+main way to use it. The Linux standalone pieces (GTK4 app, GNOME top-bar indicator, `--float` window and
+the `.deb` package) still work but are **deprecated** and will be removed in a future release; the CLI
+stays.
 
 - **Quota / budget**: your seat's premium-request quota, read from GitHub in credits and shown in
   dollars (credits ⇄ USD at a configurable rate, 100 credits = $1 by default), with percent used, what is
@@ -60,11 +62,14 @@ Details, API and troubleshooting: [docs/WEB.md](docs/WEB.md).
 python3 bin/token-monitor --text      # plain snapshot
 python3 bin/token-monitor --json      # machine-readable (what the GNOME extension reads)
 python3 bin/token-monitor --plot      # write .token-monitor/usage.svg (--out FILE)
-python3 bin/token-monitor --float     # frameless always-on-top tkinter window (needs python3-tk)
+python3 bin/token-monitor --float     # deprecated: frameless always-on-top tkinter window (needs python3-tk)
 python3 bin/token-monitor --selftest  # checks, no network
 ```
 
-### GTK app and GNOME top bar (from a checkout)
+### GTK app and GNOME top bar (deprecated)
+
+> **Deprecated.** The Linux standalone app, the GNOME extension, `--float` and the `.deb` will be
+> discontinued in a future release. New features go to the web dashboard only. Prefer the web dashboard.
 
 Needs PyGObject with `Gtk-4.0` and `Adw-1.0` (GTK 4.14+ for the live charts).
 
@@ -77,7 +82,7 @@ token-monitor                 # or launch "Token Monitor" from the app grid
 The links point into the checkout, so edits take effect at once. The GNOME extension
 (`token-monitor@local`, GNOME Shell 45–50) needs a log out / log in to load on Wayland. The extension runs `~/.local/bin/token-monitor` (or `/usr/bin/token-monitor` when the .deb is installed).
 
-### Debian / Ubuntu package
+### Debian / Ubuntu package (deprecated)
 
 ```sh
 ./packaging/build-deb.sh                       # writes dist/token-monitor_<version>_all.deb
@@ -235,7 +240,7 @@ node --check token_monitor/web/app.js  # syntax check of the dashboard script
   broken down.
 - Exact daily spend starts at the first recorded snapshot; run the app regularly to collect more.
 - No authentication on the web dashboard (localhost only by design).
-- Linux / GNOME focus. GTK4 cannot pin a window on Wayland, so `--float` (tkinter, via XWayland) is the
+- Linux / GNOME focus for the standalone pieces, which are deprecated (see above). GTK4 cannot pin a window on Wayland, so `--float` (tkinter, via XWayland) is the
   always-on-top option. The `.deb` is only built and tested on Debian/Ubuntu-style systems.
 - The `curl` source is not available inside the Docker image (no `curl` in the slim image).
 
