@@ -40,6 +40,13 @@ Numbers are never ambiguous about direction: every percentage is **consumption**
 `33% used` — the bar fills as the quota is spent, so nothing has to be inferred from a bare `33%`.
 The prepaid providers report money instead of a percentage for the same reason.
 
+## Hiding providers
+
+Only providers that are set up (a login or API key found) are shown. To hide one you do not want,
+open the **Filters** tab in the app and switch it off; it applies at once, without a refetch. The
+choice is saved in `~/.config/ammeter/hidden.json` (`{"providers": ["deepseek"]}`) and also applies
+to `--text`, `--json` and the floating window.
+
 ## Install
 
 Requirements: a Linux desktop with Python 3.10+; PyGObject with `Gtk-4.0` and `Adw-1.0` for the app
@@ -105,8 +112,9 @@ ammeter/
   __init__.py            version, app id, palette, icon names
   providers.py           one fetcher per provider, each returning a normalised entry
   formatting.py          pure helpers: bars, reset times, severities, error wording
-  core.py                collect(), the row schema, stale handling, expired-window rule
+  core.py                collect(), visible(), the row schema, stale handling, expired-window rule
   cache.py               last-good cache on disk (~/.cache/ammeter/last-good.json)
+  filters.py             hidden providers, saved in ~/.config/ammeter/hidden.json
   cli.py                 arguments, --text/--json/--selftest, launches a front-end
   gtk_app.py             GTK4 + libadwaita app (Adw.PreferencesGroup per provider)
   float_window.py        tkinter always-on-top window
