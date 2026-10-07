@@ -90,6 +90,38 @@ code does not work there: put settings in `~/.config/token-monitor/config`. Hist
 `~/.local/share/token-monitor/` automatically when the code directory is read-only (override with
 `TOKEN_MONITOR_HISTORY_DIR`).
 
+## Setup with an agent
+
+Paste this into a coding agent (OpenCode, Claude Code, Codex, ...) opened in the folder where you want the
+project. Replace `<GITHUB_HOST>` with your GitHub Enterprise host, or write `github.com`.
+
+````text
+Set up https://github.com/Cividati/token-monitor on this machine and get the web dashboard running.
+
+1. Check the prerequisites and tell me what is missing before installing anything:
+   Linux, git, Docker with the compose plugin (or Python 3.10+ if Docker is not available), and the
+   GitHub CLI (`gh`). If I need the VPN for <GITHUB_HOST>, tell me to connect it.
+2. Clone the repo into ./token-monitor and cd into it.
+3. Check `gh auth status -h <GITHUB_HOST>`. If I am not logged in, stop and ask me to run
+   `gh auth login -h <GITHUB_HOST>` myself. Never ask me to paste a token into the chat.
+4. If <GITHUB_HOST> is not github.com, copy `.env.example` to `.env`, run `chmod 600 .env`, and set
+   `TOKEN_MONITOR_GH_HOST=<GITHUB_HOST>`. Do not set `TOKEN_MONITOR_BUDGET`: it overrides the real budget.
+5. Run `python3 bin/token-monitor --selftest` (expect "selftest ok"), then `python3 bin/token-monitor --text`.
+   The first line should name the plan, not "mock data".
+6. Start the dashboard with `scripts/web-up.sh -d` (or `python3 -m token_monitor.web --host 127.0.0.1
+   --port 8080` without Docker). Then check `curl -s http://localhost:8080/api/data`: the provider
+   must have `"mock": false`.
+7. Report: the dashboard URL, the spent / budget / left figures, and anything that looked wrong.
+
+Rules: never print, log or commit a token. Do not commit `.env` or `.token-monitor/`. Keep the dashboard on
+127.0.0.1: it has no authentication. Ask before changing anything outside the project folder.
+
+If something fails: a red MOCK DATA banner means no token reached the app (log in with `gh`, then rerun
+`scripts/web-up.sh -d`); a 401 means an expired login (`gh auth refresh -h <GITHUB_HOST>`); an offline
+banner means <GITHUB_HOST> is unreachable (VPN); empty charts mean the OpenCode database was not found
+(`TOKEN_MONITOR_OPENCODE_DB`). More in docs/WEB.md and the in-app "How to set up" page.
+````
+
 ## Configuration
 
 Copy `.env.example` to `.env` (`chmod 600`) and edit; every setting is optional.
