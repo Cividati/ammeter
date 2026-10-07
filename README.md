@@ -1,8 +1,10 @@
 # Token Monitor
 
 A monitor for your **GitHub Copilot premium-request quota** against its monthly budget, with local
-usage estimates from [OpenCode](https://opencode.ai). It comes as a browser dashboard (Docker or plain
-Python), a native GTK4 app, a GNOME top-bar indicator and a CLI.
+usage estimates from [OpenCode](https://opencode.ai). The **web dashboard** (Docker or plain Python) is the
+main way to use it. The Linux standalone pieces (GTK4 app, GNOME top-bar indicator, `--float` window and
+the `.deb` package) still work but are **deprecated** and will be removed in a future release; the CLI
+stays.
 
 - **Quota / budget**: your seat's premium-request quota, read from GitHub in credits and shown in
   dollars (credits ⇄ USD at a configurable rate, 100 credits = $1 by default), with percent used, what is
@@ -23,13 +25,18 @@ Python), a native GTK4 app, a GNOME top-bar indicator and a CLI.
 ## Screenshots
 
 <p>
-<img src="docs/screenshot-budget.png" width="300" alt="GTK app, Budget page (mock data)">
-<img src="docs/screenshot-usage.png" width="300" alt="GTK app, Usage page (mock data)">
+<img src="docs/screenshot-dashboard-dark.png" width="49%" alt="Web dashboard, dark theme: budget gauge, hourly tokens and cost charts">
+<img src="docs/screenshot-dashboard-light.png" width="49%" alt="Web dashboard, light theme">
 </p>
 
-*The GTK app's Budget and Usage pages, rendered with the built-in mock data (hence the euro amounts).
-These are early captures; labels and layout have changed slightly since. The web dashboard has no
-screenshot yet.*
+<p>
+<img src="docs/screenshot-usage-charts.png" width="49%" alt="Web dashboard usage cards: hourly and daily charts, input/output/cache tokens, most used models and skills">
+<img src="docs/screenshot-how-it-works.png" width="49%" alt="The How it's calculated tab of the web dashboard">
+</p>
+
+*The web dashboard in dark and light themes, its usage cards, and the "How it's calculated" tab.
+All four captures use the built-in **sample data** (hence the euro amounts and the MOCK DATA banner),
+not real usage.*
 
 ## Quick start
 
@@ -55,11 +62,14 @@ Details, API and troubleshooting: [docs/WEB.md](docs/WEB.md).
 python3 bin/token-monitor --text      # plain snapshot
 python3 bin/token-monitor --json      # machine-readable (what the GNOME extension reads)
 python3 bin/token-monitor --plot      # write .token-monitor/usage.svg (--out FILE)
-python3 bin/token-monitor --float     # frameless always-on-top tkinter window (needs python3-tk)
+python3 bin/token-monitor --float     # deprecated: frameless always-on-top tkinter window (needs python3-tk)
 python3 bin/token-monitor --selftest  # checks, no network
 ```
 
-### GTK app and GNOME top bar (from a checkout)
+### GTK app and GNOME top bar (deprecated)
+
+> **Deprecated.** The Linux standalone app, the GNOME extension, `--float` and the `.deb` will be
+> discontinued in a future release. New features go to the web dashboard only. Prefer the web dashboard.
 
 Needs PyGObject with `Gtk-4.0` and `Adw-1.0` (GTK 4.14+ for the live charts).
 
@@ -72,7 +82,7 @@ token-monitor                 # or launch "Token Monitor" from the app grid
 The links point into the checkout, so edits take effect at once. The GNOME extension
 (`token-monitor@local`, GNOME Shell 45–50) needs a log out / log in to load on Wayland. The extension runs `~/.local/bin/token-monitor` (or `/usr/bin/token-monitor` when the .deb is installed).
 
-### Debian / Ubuntu package
+### Debian / Ubuntu package (deprecated)
 
 ```sh
 ./packaging/build-deb.sh                       # writes dist/token-monitor_<version>_all.deb
@@ -84,6 +94,38 @@ entry, the icon and the GNOME extension. The install directory is not writable, 
 code does not work there: put settings in `~/.config/token-monitor/config`. History is kept in
 `~/.local/share/token-monitor/` automatically when the code directory is read-only (override with
 `TOKEN_MONITOR_HISTORY_DIR`).
+
+## Setup with an agent
+
+Paste this into a coding agent (OpenCode, Claude Code, Codex, ...) opened in the folder where you want the
+project. Replace `<GITHUB_HOST>` with your GitHub Enterprise host, or write `github.com`.
+
+````text
+Set up https://github.com/Cividati/token-monitor on this machine and get the web dashboard running.
+
+1. Check the prerequisites and tell me what is missing before installing anything:
+   Linux, git, Docker with the compose plugin (or Python 3.10+ if Docker is not available), and the
+   GitHub CLI (`gh`). If I need the VPN for <GITHUB_HOST>, tell me to connect it.
+2. Clone the repo into ./token-monitor and cd into it.
+3. Check `gh auth status -h <GITHUB_HOST>`. If I am not logged in, stop and ask me to run
+   `gh auth login -h <GITHUB_HOST>` myself. Never ask me to paste a token into the chat.
+4. If <GITHUB_HOST> is not github.com, copy `.env.example` to `.env`, run `chmod 600 .env`, and set
+   `TOKEN_MONITOR_GH_HOST=<GITHUB_HOST>`. Do not set `TOKEN_MONITOR_BUDGET`: it overrides the real budget.
+5. Run `python3 bin/token-monitor --selftest` (expect "selftest ok"), then `python3 bin/token-monitor --text`.
+   The first line should name the plan, not "mock data".
+6. Start the dashboard with `scripts/web-up.sh -d` (or `python3 -m token_monitor.web --host 127.0.0.1
+   --port 8080` without Docker). Then check `curl -s http://localhost:8080/api/data`: the provider
+   must have `"mock": false`.
+7. Report: the dashboard URL, the spent / budget / left figures, and anything that looked wrong.
+
+Rules: never print, log or commit a token. Do not commit `.env` or `.token-monitor/`. Keep the dashboard on
+127.0.0.1: it has no authentication. Ask before changing anything outside the project folder.
+
+If something fails: a red MOCK DATA banner means no token reached the app (log in with `gh`, then rerun
+`scripts/web-up.sh -d`); a 401 means an expired login (`gh auth refresh -h <GITHUB_HOST>`); an offline
+banner means <GITHUB_HOST> is unreachable (VPN); empty charts mean the OpenCode database was not found
+(`TOKEN_MONITOR_OPENCODE_DB`). More in docs/WEB.md and the in-app "How to set up" page.
+````
 
 ## Configuration
 
@@ -198,7 +240,7 @@ node --check token_monitor/web/app.js  # syntax check of the dashboard script
   broken down.
 - Exact daily spend starts at the first recorded snapshot; run the app regularly to collect more.
 - No authentication on the web dashboard (localhost only by design).
-- Linux / GNOME focus. GTK4 cannot pin a window on Wayland, so `--float` (tkinter, via XWayland) is the
+- Linux / GNOME focus for the standalone pieces, which are deprecated (see above). GTK4 cannot pin a window on Wayland, so `--float` (tkinter, via XWayland) is the
   always-on-top option. The `.deb` is only built and tested on Debian/Ubuntu-style systems.
 - The `curl` source is not available inside the Docker image (no `curl` in the slim image).
 

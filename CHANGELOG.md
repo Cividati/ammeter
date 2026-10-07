@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Deprecated
+- The Linux standalone front-ends (GTK4 app, GNOME top-bar extension, `--float` window) and the `.deb`
+  package will be discontinued in a future release. The web dashboard is the supported front-end.
+
+### Changed
+- README: web dashboard screenshots (sample data) and a "Setup with an agent" prompt.
+
 ## [0.1.0] - 2026-10-07
 
 First public release. Forked from [Cividati/ammeter](https://github.com/Cividati/ammeter); the
