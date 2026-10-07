@@ -23,13 +23,18 @@ Python), a native GTK4 app, a GNOME top-bar indicator and a CLI.
 ## Screenshots
 
 <p>
-<img src="docs/screenshot-budget.png" width="300" alt="GTK app, Budget page (mock data)">
-<img src="docs/screenshot-usage.png" width="300" alt="GTK app, Usage page (mock data)">
+<img src="docs/screenshot-dashboard-dark.png" width="49%" alt="Web dashboard, dark theme: budget gauge, hourly tokens and cost charts">
+<img src="docs/screenshot-dashboard-light.png" width="49%" alt="Web dashboard, light theme">
 </p>
 
-*The GTK app's Budget and Usage pages, rendered with the built-in mock data (hence the euro amounts).
-These are early captures; labels and layout have changed slightly since. The web dashboard has no
-screenshot yet.*
+<p>
+<img src="docs/screenshot-usage-charts.png" width="49%" alt="Web dashboard usage cards: hourly and daily charts, input/output/cache tokens, most used models and skills">
+<img src="docs/screenshot-how-it-works.png" width="49%" alt="The How it's calculated tab of the web dashboard">
+</p>
+
+*The web dashboard in dark and light themes, its usage cards, and the "How it's calculated" tab.
+All four captures use the built-in **sample data** (hence the euro amounts and the MOCK DATA banner),
+not real usage.*
 
 ## Quick start
 
