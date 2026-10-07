@@ -22,21 +22,12 @@ stays.
 > Forked from [Cividati/ammeter](https://github.com/Cividati/ammeter) (MIT). See
 > [Differences from ammeter](#differences-from-ammeter).
 
-## Screenshots
+## Screenshot
 
-<p>
-<img src="docs/screenshot-dashboard-dark.png" width="49%" alt="Web dashboard, dark theme: budget gauge, hourly tokens and cost charts">
-<img src="docs/screenshot-dashboard-light.png" width="49%" alt="Web dashboard, light theme">
-</p>
+<img src="docs/screenshot-dashboard-dark.png" alt="Token Monitor web dashboard: budget gauge, spent / budget / left, range and chart-type controls, hourly tokens and cost charts">
 
-<p>
-<img src="docs/screenshot-usage-charts.png" width="49%" alt="Web dashboard usage cards: hourly and daily charts, input/output/cache tokens, most used models and skills">
-<img src="docs/screenshot-how-it-works.png" width="49%" alt="The How it's calculated tab of the web dashboard">
-</p>
-
-*The web dashboard in dark and light themes, its usage cards, and the "How it's calculated" tab.
-All four captures use the built-in **sample data** (hence the euro amounts and the MOCK DATA banner),
-not real usage.*
+*The web dashboard front page. It uses the built-in **sample data** (hence the euro amounts and the
+MOCK DATA banner), not real usage.*
 
 ## Quick start
 

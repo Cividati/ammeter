@@ -11,7 +11,7 @@ All notable changes to this project are documented here. The format follows
   package will be discontinued in a future release. The web dashboard is the supported front-end.
 
 ### Changed
-- README: web dashboard screenshots (sample data) and a "Setup with an agent" prompt.
+- README: a web dashboard screenshot (sample data) and a "Setup with an agent" prompt.
 
 ## [0.1.0] - 2026-10-07
 
