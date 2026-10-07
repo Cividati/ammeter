@@ -21,7 +21,7 @@ the notes are built once, here, instead of in each of them.
 """
 from datetime import datetime, timezone
 
-from . import TITLES, cache
+from . import TITLES, cache, filters
 from .formatting import absolute_reset, error_text, parse_dt
 from .providers import PROVIDERS
 
@@ -79,3 +79,20 @@ def problems(data):
         elif entry.get("reached"):
             found.append((entry["name"], "plan limit reached"))
     return found
+
+
+# failures that only mean "this provider was never set up on this machine"
+NOT_CONFIGURED = ("FileNotFoundError", "no oauth token", "no tokens in", "no OPENROUTER_API_KEY",
+                  "no DEEPSEEK_API_KEY")
+
+
+def configured(entry):
+    """False for an entry that has nothing to show only because it has no login or API key."""
+    error = entry.get("error") or ""
+    return bool(entry.get("rows")) or not any(text in error for text in NOT_CONFIGURED)
+
+
+def visible(data, hidden=None):
+    """What every front-end shows: providers that are set up and not hidden by the user."""
+    hidden = filters.load() if hidden is None else hidden
+    return [entry for entry in data if entry.get("key") not in hidden and configured(entry)]

@@ -14,7 +14,7 @@ import urllib.error
 from pathlib import Path
 
 from . import (APP_ID, APP_NAME, MARKS, REFRESH_SECONDS, TITLES, __version__, cache)
-from .core import collect, live_providers, problems
+from .core import collect, live_providers, problems, visible
 from .formatting import (
     BAR_WIDTH,
     EMPTY,
@@ -108,6 +108,28 @@ def selftest():
         core.PROVIDERS, cache.CACHE_FILE = saved_providers, saved_cache
         core._last_good.clear()
 
+    # providers without credentials stay out of sight, and hidden ones go too
+    from . import filters
+    saved_file = filters.HIDDEN_FILE
+    filters.HIDDEN_FILE = Path(tempfile.mkdtemp(prefix="ammeter-selftest-")) / "config" / "hidden.json"
+    try:
+        assert filters.load() == set(), "no file means nothing hidden"
+        data = [{"key": "claude", "rows": [1]},
+                {"key": "codex", "rows": [], "error": "FileNotFoundError: no auth.json"},
+                {"key": "openrouter", "rows": [], "error": "RuntimeError: no OPENROUTER_API_KEY in x"},
+                {"key": "deepseek", "rows": [], "error": "offline"}]
+        assert [e["key"] for e in core.visible(data)] == ["claude", "deepseek"], \
+            "unconfigured providers vanish, real failures stay"
+        filters.set_hidden("deepseek", True)
+        assert filters.is_hidden("deepseek") and [e["key"] for e in core.visible(data)] == ["claude"]
+        assert not list(filters.HIDDEN_FILE.parent.glob("*.tmp")), "the write is atomic"
+        filters.set_hidden("deepseek", False)
+        assert filters.load() == set()
+        filters.HIDDEN_FILE.write_text("{not json")
+        assert filters.load() == set(), "a damaged file is ignored"
+    finally:
+        filters.HIDDEN_FILE = saved_file
+
     assert problems([{"name": "A", "reached": True, "rows": []}]) == [("A", "plan limit reached")]
     assert live_providers([{"rows": [1]}, {"rows": []}]) == 1
     print("selftest ok")
@@ -135,7 +157,7 @@ def main(argv=None):
         selftest()
         return 0
     if args & {"--text", "--json"}:
-        data = collect()
+        data = visible(collect())
         if "--json" in args:
             print(json.dumps(data, indent=2))
         else:
@@ -147,7 +169,7 @@ def main(argv=None):
     if not args & {"--float", "--framed"} and launch_gtk():
         return 0
     from .float_window import run as run_float_window
-    run_float_window(collect(), framed="--framed" in args)
+    run_float_window(visible(collect()), framed="--framed" in args)
     return 0
 
 

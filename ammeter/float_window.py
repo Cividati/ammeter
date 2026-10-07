@@ -10,7 +10,7 @@ import tkinter as tk
 from datetime import datetime
 
 from . import COLOURS, MARKS, REFRESH_SECONDS, STATUS
-from .core import collect
+from .core import collect, visible
 from .formatting import bar, severity, used_label
 
 BACKGROUND = "#0b0b11"
@@ -147,12 +147,12 @@ def run(data, refresh_seconds=REFRESH_SECONDS, framed=False):
 
     def worker():
         while True:
-            incoming.put(collect())
+            incoming.put(visible(collect()))
             time.sleep(refresh_seconds)
 
     def refresh():
         footer.config(text="refreshing\u2026")
-        threading.Thread(target=lambda: incoming.put(collect()), daemon=True).start()
+        threading.Thread(target=lambda: incoming.put(visible(collect())), daemon=True).start()
 
     def pump():
         try:
