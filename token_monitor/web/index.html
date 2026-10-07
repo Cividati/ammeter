@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a1424">
+  <script src="theme.js"></script>
+  <title>Token Monitor</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231c69d4'/%3E%3Cpath d='M7 21a9 9 0 0 1 18 0' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M16 21l5-7' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+        <rect width="32" height="32" rx="9" fill="url(#g)"/>
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3d8be8"/><stop offset="1" stop-color="#0a4fa8"/></linearGradient></defs>
+        <path d="M7 21a9 9 0 0 1 18 0" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <path d="M16 21l5-7" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Token Monitor</h1>
+        <p class="sub" id="plan">Loading…</p>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Pages">
+      <a href="#" id="tab-dash" aria-current="page">Dashboard</a>
+      <a href="#how" id="tab-how">How it's calculated</a>
+      <a href="#setup" id="tab-setup">How to set up</a>
+    </nav>
+    <div class="actions">
+      <span class="updated" id="updated" aria-live="off"></span>
+      <button class="btn" id="refresh" type="button" aria-label="Refresh now">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="lbl">Refresh</span>
+      </button>
+      <button class="btn icon theme" id="theme" type="button" aria-label="Switch to light theme" title="Switch theme">
+        <svg class="moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="btn" id="open-settings" type="button" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <span class="lbl">Settings</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <div id="banners" role="status" aria-live="polite"></div>
+
+    <div id="view-dash">
+    <section class="card hero" id="hero" aria-labelledby="hero-title" hidden>
+      <h2 id="hero-title" class="visually-hidden">Budget</h2>
+      <div class="gauge" id="gauge" role="img"></div>
+      <dl class="stats" id="stats"></dl>
+    </section>
+
+    <section id="empty" class="card empty" hidden>
+      <h2>Nothing to show yet</h2>
+      <p id="empty-text">No provider is set up, or all of them are hidden. Open Settings to show them again.</p>
+    </section>
+
+    <div id="usage" hidden>
+      <div class="rangebar">
+        <div class="seg" role="radiogroup" aria-label="Time range" id="ranges"></div>
+        <div class="seg ctype" role="radiogroup" aria-label="Chart type" id="ctype"></div>
+        <p class="basis" id="basis"></p>
+        <div class="slice" id="slice" role="group" aria-label="Time slice">
+          <label>From <input type="datetime-local" id="slice-from" step="3600"></label>
+          <label>To <input type="datetime-local" id="slice-to" step="3600"></label>
+          <button class="btn" id="slice-reset" type="button">Reset</button>
+          <span class="hint">Pick a start and end, or drag across an hourly chart. It filters every card.</span>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section class="card chartcard" aria-labelledby="th-title">
+          <header><h2 id="th-title">Tokens per hour</h2><p class="cap" id="th-cap"></p></header>
+          <div class="legend" id="th-legend"></div>
+          <div class="chart" id="th-chart"></div>
+        </section>
+        <section class="card chartcard" aria-labelledby="ch-title">
+          <header><h2 id="ch-title">Cost per hour</h2><p class="cap" id="ch-cap"></p></header>
+          <div class="legend" id="ch-legend"></div>
+          <div class="chart" id="ch-chart"></div>
+        </section>
+        <section class="card chartcard" aria-labelledby="t-title">
+          <header><h2 id="t-title">Tokens per day</h2><p class="cap" id="t-cap"></p></header>
+          <div class="legend" id="t-legend"></div>
+          <div class="chart" id="tokens-chart"></div>
+        </section>
+        <section class="card chartcard" aria-labelledby="c-title">
+          <header><h2 id="c-title">Cost per day</h2><p class="cap" id="c-cap"></p></header>
+          <div class="legend" id="c-legend"></div>
+          <div class="chart" id="cost-chart"></div>
+        </section>
+        <section class="card tokstrip" aria-labelledby="k-title">
+          <header><div><h2 id="k-title">Input, output and cache tokens</h2><p class="cap" id="k-cap"></p></div></header>
+          <dl class="tok" id="tok-stats"></dl>
+        </section>
+        <section class="card chartcard" aria-labelledby="io-title">
+          <header><h2 id="io-title">Input vs output tokens</h2><p class="cap" id="io-cap"></p></header>
+          <div class="legend" id="io-legend"></div>
+          <div class="chart" id="io-chart"></div>
+        </section>
+        <section class="card chartcard" aria-labelledby="ca-title">
+          <header><h2 id="ca-title">Cache tokens</h2><p class="cap" id="ca-cap"></p></header>
+          <div class="legend" id="ca-legend"></div>
+          <div class="chart" id="cache-chart"></div>
+        </section>
+        <section class="card models" aria-labelledby="m-title">
+          <header>
+            <div><h2 id="m-title">Most used models</h2><p class="cap" id="m-cap"></p></div>
+            <div class="seg small" role="radiogroup" aria-label="Rank models by" id="by"></div>
+          </header>
+          <ol id="model-list" class="rank"></ol>
+        </section>
+        <section class="card models" aria-labelledby="sk-title">
+          <header><div><h2 id="sk-title">Most used skills</h2><p class="cap" id="sk-cap"></p></div></header>
+          <ol id="skill-list" class="rank"></ol>
+        </section>
+      </div>
+      <p class="foot" id="foot"></p>
+    </div>
+    </div>
+
+    <article id="view-how" class="how" hidden aria-labelledby="how-title">
+      <header class="how-head">
+        <h2 id="how-title">How it's calculated</h2>
+        <p>Where each number on the dashboard comes from, what is exact, and what is only an estimate. The examples use round numbers: a 30,000-credit plan (<b>$300</b>), where <b>100 credits = $1</b>.</p>
+      </header>
+
+      <div class="how-layout">
+        <nav class="toc card" aria-label="On this page">
+          <ol>
+            <li><a href="#how-sources">Where numbers come from</a></li>
+            <li><a href="#how-budget">Budget, spent, left</a></li>
+            <li><a href="#how-daily">Daily cost</a></li>
+            <li><a href="#how-local">Local cost per message</a></li>
+            <li><a href="#how-calibration">Calibration factor</a></li>
+            <li><a href="#how-lasts">Lasts until</a></li>
+            <li><a href="#how-models">Most used models</a></li>
+            <li><a href="#how-offline">Offline and sample data</a></li>
+            <li><a href="#how-tokens">Tokens</a></li>
+            <li><a href="#how-skills">Most used skills</a></li>
+            <li><a href="#how-charts">Chart types</a></li>
+            <li><a href="#how-slice">Time slice</a></li>
+            <li><a href="#how-exact">Exact or estimated?</a></li>
+            <li><a href="#how-glossary">Glossary</a></li>
+          </ol>
+        </nav>
+
+        <div class="how-body">
+          <section class="card live" id="how-live" aria-labelledby="how-live-t" hidden>
+            <h3 id="how-live-t">Your numbers right now</h3>
+            <dl class="kv" id="how-live-list"></dl>
+          </section>
+
+          <section class="card" id="how-sources" aria-labelledby="how-sources-t">
+            <h3 id="how-sources-t">1. Where the numbers come from</h3>
+            <p>There are three sources. Each one answers a different question.</p>
+            <ul>
+              <li><b>GitHub quota</b> (<span class="tag exact">exact</span>). The dashboard asks GitHub's <code>copilot_internal/user</code> endpoint, using your <code>gh</code> login token (or <code>TOKEN_MONITOR_GH_TOKEN</code>). From the answer it keeps only <code>premium_interactions</code>: the <code>entitlement</code> (your budget), <code>remaining</code> (spent = entitlement − remaining), the quota reset date, and the plan name. Nothing else is stored.</li>
+              <li><b>OpenCode's local database</b> (<span class="tag est">estimate</span>). It is opened read-only. For each assistant message it reads the model, the token counts and the cost OpenCode wrote down. This works offline and gives the per-day, per-hour and per-model views.</li>
+              <li><b>History snapshots</b> (<span class="tag exact">exact</span>, but sparse). Each time the quota is fetched and has changed, one line (time, spent, budget, period end) is added to <code>.token-monitor/history.jsonl</code>. Daily costs and the calibration are built from these.</li>
+            </ul>
+            <p class="note">An organisation budget portal's own figure is <b>not</b> used: such portals usually sit behind single sign-on, which a script can't use. What you see is your <b>personal seat quota</b> from GitHub. If the portal shows a different budget, that is why.</p>
+          </section>
+
+          <section class="card" id="how-budget" aria-labelledby="how-budget-t">
+            <h3 id="how-budget-t">2. Budget, spent, left and % used</h3>
+            <p>GitHub reports credits. The dashboard shows dollars by dividing by <code>TOKEN_MONITOR_CREDITS_PER_USD</code> (default <b>100</b>; set it to 0 to see raw credits). History and <code>--json</code> keep the raw credits.</p>
+            <div class="scroll"><table>
+              <thead><tr><th>Item</th><th>How</th><th>Example</th></tr></thead>
+              <tbody>
+                <tr><td>Budget</td><td>entitlement ÷ 100</td><td>30,000 cr ÷ 100 = <b>$300</b></td></tr>
+                <tr><td>Spent</td><td>(entitlement − remaining) ÷ 100</td><td>(30,000 − 21,600) cr ÷ 100 = <b>$84</b></td></tr>
+                <tr><td>Left</td><td>budget − spent (never below 0)</td><td>$300 − $84 = <b>$216</b> (21,600 cr)</td></tr>
+                <tr><td>% used</td><td>spent ÷ budget</td><td>84 ÷ 300 = <b>28%</b></td></tr>
+              </tbody>
+            </table></div>
+            <p>The gauge turns amber at 70% and red at 90%. The period runs from one month before the reset date to the reset date.</p>
+            <p class="note warn"><b>Budget override gotcha.</b> <code>TOKEN_MONITOR_BUDGET</code> (or the Settings box) is in <b>dollars</b>, not credits. Typing <code>400</code> means a $400 limit (40,000 credits). Typing <code>30000</code> means $30,000, and every percentage will look tiny. The override only changes the limit: spent still comes from GitHub, and "left", % used and the "lasts until" line are all recalculated from your number. Clear it to go back to GitHub's value.</p>
+          </section>
+
+          <section class="card" id="how-daily" aria-labelledby="how-daily-t">
+            <h3 id="how-daily-t">3. Daily cost</h3>
+            <p>GitHub only gives a running total, not a per-day figure. So the dashboard looks at how much that total <b>grew between two snapshots</b>, and shares the growth over the days in between, in proportion to the local cost of the messages on each day (or evenly by time if there were none).</p>
+            <div class="ex">
+              <b>Example.</b> Monday 22:00 the quota reads 8,000 cr. Tuesday 22:00 it reads 8,350 cr, so the real growth is 350 cr = <b>$3.50</b>. OpenCode logged $0.50 of messages on Monday and $1.50 on Tuesday. Monday gets 3.50 × 0.25 = <b>$0.88</b>, Tuesday gets 3.50 × 0.75 = <b>$2.63</b>.
+            </div>
+            <p>Days or messages that fall outside every snapshot interval (before the first snapshot, between billing periods, or since the last snapshot) use the local estimate instead, scaled by the calibration factor. In the cost chart, the <span class="sw-dot s-cost"></span> bright blue part is portal spend and the <span class="sw-dot s-est"></span> muted blue part is local estimate. Snapshots are only taken while something is fetching (the dashboard open, or the CLI), so a long gap gives coarser days.</p>
+            <p>The 24h and 72h ranges are always local estimates: portal spend is too sparse to split by hour.</p>
+          </section>
+
+          <section class="card" id="how-local" aria-labelledby="how-local-t">
+            <h3 id="how-local-t">4. Local cost per message</h3>
+            <p>OpenCode works out a dollar cost for every message from the model's price per million tokens, for four kinds of tokens: <b>input</b>, <b>output</b>, <b>cache read</b> and <b>cache write</b>. The dashboard adds these up per hour, day and model.</p>
+            <div class="ex">
+              <b>Example.</b> At $3 per million input tokens and $15 per million output tokens, a message with 20,000 input and 1,000 output costs 0.02 × 3 + 0.001 × 15 = <b>$0.075</b>, before cache prices.
+            </div>
+            <ul>
+              <li>It's OpenCode's own estimate, not what GitHub charges. GitHub bills Copilot in credits per request, with its own multipliers per model.</li>
+              <li>It only covers usage that went through OpenCode. Copilot in your editor, the Copilot CLI or the web is counted by GitHub but never shows up here. The "left" figure is always right; per-day and per-model detail can be partial.</li>
+              <li>Some messages are recorded with a cost of 0, for example when OpenCode has no price for a model. Their tokens still count, but their cost doesn't, so local cost can run low. Models and messages with no data at all are dropped.</li>
+            </ul>
+          </section>
+
+          <section class="card" id="how-calibration" aria-labelledby="how-cal-t">
+            <h3 id="how-cal-t">5. Calibration factor</h3>
+            <p>To bring the local estimate closer to what GitHub really charged, the dashboard compares the two over every snapshot interval where <b>both grew</b>:</p>
+            <p class="formula">factor = portal growth ÷ local cost in the same intervals</p>
+            <div class="ex">
+              <b>Example.</b> Over a few intervals the quota grew $3.50 (350 cr) while OpenCode logged $2.00. The factor is 3.50 ÷ 2.00 = <b>×1.75</b>. A new local message of $1.00 is then shown as $1.75.
+            </div>
+            <ul>
+              <li>It's applied automatically only once the matched local cost reaches <b>$1.00</b>. Until then the factor is 1 and the Calibration tile shows "—".</li>
+              <li>To fix your own number, set <code>TOKEN_MONITOR_COST_FACTOR</code>. It always wins over the calibration.</li>
+              <li>Limits: a few intervals make a noisy ratio; GitHub's per-model multipliers differ from token prices, so the ratio shifts with your model mix; and usage from other Copilot clients inside an interval pushes portal growth up while local cost stays put. Treat it as a rough scale, not a rate.</li>
+            </ul>
+          </section>
+
+          <section class="card" id="how-lasts" aria-labelledby="how-lasts-t">
+            <h3 id="how-lasts-t">6. Lasts until: when the budget runs out</h3>
+            <p>The <b>Lasts until</b> line says how long the budget lasts if you keep spending like you have been. <b>Spending per day</b> (the burn rate) is the average daily cost over the last 7 days (including today), taken from the daily costs above. If local usage covers less than half of this period's spend (so it would hide usage from other tools), the dashboard uses the <b>period average</b> instead: spent ÷ days elapsed (at least 1). The tile says which one: "7d avg" or "period avg". The tile shows $ per day, with the credits per day under it; multiply by 100 for credits per day ($4/day = 400 cr/day).</p>
+            <p class="formula">last until = now + (budget − spent) ÷ spending per day</p>
+            <div class="ex">
+              <b>Example.</b> Spent $84 of $300, burning $4/day (400 cr/day). Left is $216, so it lasts 216 ÷ 4 = <b>54 days</b>. With 20 days to the reset, the projected spend at the reset is 84 + 4 × 20 = <b>$164</b>, so the line says <b>"Lasts past the reset (about $136 left on 1 Nov)"</b>.<br>
+              At $12/day instead: 216 ÷ 12 = <b>18 days</b>. That is 2 days before the reset, so the line turns <span class="crit-text">red</span> and says <b>"At this pace credits run out ~Wed 28 Oct (in 18d), 2d before the reset"</b> (with your real date).
+            </div>
+            <p>Other states: "No recent spending" when nothing was spent lately, and "Budget used up" (red) once spent reaches the budget. In the text output and the desktop app the same sentence is on the row called <b>lasts until</b>.</p>
+          </section>
+
+          <section class="card" id="how-models" aria-labelledby="how-models-t">
+            <h3 id="how-models-t">7. Most used models</h3>
+            <p>Per-model cost and tokens are added up over the days in the range you picked, then ranked by <b>Cost</b> or by <b>Tokens</b> (your choice). The top 6 are listed; everything else is grouped as <b>Other (n)</b>. The percentage is the model's share of the chosen measure among visible models. Hidden models (Settings) are left out of the shares.</p>
+            <p>Model costs are scaled by the calibration factor, and on days with portal spend they are rescaled so the models add up to that day's total. <b>Rankings and shares are more reliable than the absolute amounts</b>: if the factor is off, every model is off by the same amount, so the order and shares hold.</p>
+          </section>
+
+          <section class="card" id="how-offline" aria-labelledby="how-offline-t">
+            <h3 id="how-offline-t">8. Offline, stale and sample data</h3>
+            <ul>
+              <li><b>GitHub unreachable</b> (VPN down, token expired): the dashboard shows the latest saved snapshot plus the local cost since then, adds an amber banner ("offline — last portal data 3h ago"), and marks Spent as an estimate. It goes back to exact numbers as soon as a fetch works.</li>
+              <li>If that snapshot belongs to a billing period that has already ended, it isn't shown, and you'll see an error instead.</li>
+              <li><b>Sample data:</b> with no token, no <code>gh</code> login and no history, the dashboard shows built-in sample numbers. They are always labelled "MOCK DATA" with a red banner. They are not your usage.</li>
+              <li>The page re-reads data every 60 seconds; the server reuses one fetch for 45 seconds.</li>
+            </ul>
+          </section>
+
+          <section class="card" id="how-tokens" aria-labelledby="how-tokens-t">
+            <h3 id="how-tokens-t">9. Tokens</h3>
+            <p>The token chart splits each message's tokens into <span class="sw-dot s-output"></span> <b>output</b> (including reasoning tokens), <span class="sw-dot s-input"></span> <b>input</b> (new, uncached prompt text) and <span class="sw-dot s-cache"></span> <b>cache</b> (cache reads plus cache writes). The total is the sum of the three.</p>
+            <div class="ex">
+              <b>Example.</b> One long coding turn: 6,000 input, 1,200 output, 180,000 cache read, 4,000 cache write. Total = 191,200 tokens, and cache is 184,000 of them, <b>96%</b>.
+            </div>
+            <p>Because cache is so large, the dashboard shows the pieces separately. The <b>Input, output and cache tokens</b> card gives the totals for the range you picked, with each part's share of all tokens. <b>Input vs output tokens</b> draws input and output side by side for each day (or hour), on their own scale and without cache, so you can see them. <b>Cache tokens</b> does the same for cache read and cache write. Output includes reasoning tokens. All of this is read from OpenCode's records, so it is a <span class="tag est">local estimate</span> that leaves out Copilot use in editors or the CLI.</p>
+            <div class="ex">
+              <b>Example.</b> A day with 150,000 input, 130,000 output, 9,900,000 cache read and 740,000 cache write: cache is 10.64M of 10.92M tokens (97%), yet input and output (280,000) are the part you control with your prompts, and they get their own chart.
+            </div>
+            <p>Agent sessions re-send the whole conversation every turn, and most of it comes from the cache. So cache usually dominates the token count. That's normal. Cache tokens are cheap, which is why a huge token total can still be a small cost.</p>
+          </section>
+
+          <section class="card" id="how-skills" aria-labelledby="how-skills-t">
+            <h3 id="how-skills-t">10. Most used skills</h3>
+            <p>OpenCode records each time it loads a skill. The dashboard counts those loads per skill name over the range you picked, ranks them (top 8, the rest grouped as <b>Other (n)</b>), and shows each skill's share and when it was last loaded.</p>
+            <ul>
+              <li><b>What is counted:</b> completed <code>skill</code> tool calls in OpenCode's <code>part</code> table, read from the same read-only database as the rest. Only the skill name and the time are read. The skill's text is never read or shown.</li>
+              <li><b>Provider filter:</b> a load is linked to its message so that only your selected providers count (<code>TOKEN_MONITOR_PROVIDERS</code>). If the message can't be found or has no provider, the load is still counted.</li>
+              <li><b>Not skipped quietly:</b> rows that aren't skill loads, that failed, that have no name, or that are damaged are ignored one by one; they don't stop the list.</li>
+              <li><b>It's a count, not a cost.</b> A skill that was loaded often isn't necessarily expensive, and the dashboard doesn't try to work out what a skill cost. Like the model list, this only covers OpenCode. In sample-data mode the list is sample data too.</li>
+            </ul>
+            <div class="ex">
+              <b>Example.</b> In a range where OpenCode loaded <code>caveman</code> 16 times, <code>ponytail</code> 16 times and <code>jira-management</code> 4 times, with nothing else, the shares are 44%, 44% and 11% of 36 loads.
+            </div>
+          </section>
+
+          <section class="card" id="how-charts" aria-labelledby="how-charts-t">
+            <h3 id="how-charts-t">Chart types</h3>
+            <p>The <b>Bar / Line / Dots / Pie</b> switch above the charts changes how every chart is drawn. It's remembered in your browser. The numbers behind the charts don't change.</p>
+            <ul>
+              <li><b>Bar, Line, Dots</b> draw one point per day (or per hour on 24h and 72h). In Line and Dots the token chart shows output, input and cache as separate lines, so cache is no longer stacked on top. The cost chart shows one total per day: the portal spend where it is known plus the local estimate for the rest. Hovering still shows the day's details.</li>
+              <li><b>Pie</b> (a donut) <b>does not show time</b>. It shows how the <em>whole selected range</em> splits up. Tokens per day: output, input, cache read and cache write. Input vs output: input against output. Cache tokens: read against write. Cost per day: cost by model, from the local per-model estimates. The caption on each card says what its pie shows, and the number in the middle is the total of the range.</li>
+              <li><b>Most used models and skills</b> are rankings, not time series. Bar is the list with bars, <b>Dots</b> draws each as a dot on a line, <b>Pie</b> shows each one's share, and <b>Line</b> falls back to bars because a line isn't meaningful there.</li>
+            </ul>
+            <p class="note">Because the models are scaled by the calibration factor (see above), a model pie is more reliable for shares than for dollar amounts.</p>
+          </section>
+
+          <section class="card" id="how-slice" aria-labelledby="how-slice-t">
+            <h3 id="how-slice-t">Hourly charts and the time slice</h3>
+            <p>The first two charts are <b>Tokens per hour</b> and <b>Cost per hour</b>, built from OpenCode's hourly records (the last 31 days are kept). Hovering an hour shows input, output, cache read, cache write, messages and the top models. The cost chart is in dollars only: OpenCode's estimate times the calibration factor. It's a <span class="tag est">local estimate</span>, because GitHub's quota isn't split by hour. The 24h / 72h / 7 / 14 / 30 day buttons set how far back the hourly charts go.</p>
+            <p>The <b>time slice</b> (From / To boxes under the range buttons, or drag across either hourly chart) picks whole hours, start included and end excluded, and filters <b>every</b> card: both hourly charts, the totals, the input/output/cache charts, most used models and most used skills. <b>Reset</b> (or any range button) clears it. Times outside the loaded hours (the last 31 days) can't be picked: the boxes are limited to that span, and a drag stays inside the chart. The slice works in whole local hours and lives only in this page (it isn't saved or sent anywhere). The per-day charts show the whole days the slice touches, since daily portal spend can't be cut by the hour. The header's budget numbers (spent, left, at this pace) never change with the slice.</p>
+          </section>
+
+          <section class="card" id="how-exact" aria-labelledby="how-exact-t">
+            <h3 id="how-exact-t">Which numbers are exact, which are estimated</h3>
+            <div class="scroll"><table>
+              <thead><tr><th>Number</th><th></th><th>Why</th></tr></thead>
+              <tbody>
+                <tr><td>Credits used, budget, % used, left</td><td><span class="tag exact">exact</span></td><td>Straight from GitHub (unless you set a budget override or are offline)</td></tr>
+                <tr><td>Reset date and countdown</td><td><span class="tag exact">exact</span></td><td>GitHub's quota reset date</td></tr>
+                <tr><td>Daily cost on days with snapshots</td><td><span class="tag exact">exact total</span></td><td>Real growth in the quota; the split between days is shared by local cost</td></tr>
+                <tr><td>Cost on other days, and hourly cost</td><td><span class="tag est">estimate</span></td><td>OpenCode's price estimate × calibration factor</td></tr>
+                <tr><td>Per-model cost and shares</td><td><span class="tag est">estimate</span></td><td>Only OpenCode usage; ranking is more trustworthy than amounts</td></tr>
+                <tr><td>Spending per day, "lasts until" line, end date, projection</td><td><span class="tag est">estimate</span></td><td>Assumes the recent pace continues</td></tr>
+                <tr><td>Skill loads</td><td><span class="tag est">local</span></td><td>Counted from OpenCode's records; says how often, not what it cost</td></tr>
+                <tr><td>Token counts</td><td><span class="tag exact">exact</span> for OpenCode</td><td>As recorded by OpenCode; other Copilot clients aren't included</td></tr>
+              </tbody>
+            </table></div>
+          </section>
+
+          <section class="card" id="how-glossary" aria-labelledby="how-glossary-t">
+            <h3 id="how-glossary-t">Glossary</h3>
+            <div class="scroll"><table>
+              <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+              <tbody>
+                <tr><td>Credit</td><td>GitHub's unit for premium Copilot usage. 100 credits = $1 by default.</td></tr>
+                <tr><td>Entitlement</td><td>The credits your plan includes per period. This is the budget.</td></tr>
+                <tr><td>Period / reset</td><td>The quota window, ending on GitHub's reset date.</td></tr>
+                <tr><td>Snapshot</td><td>One saved reading of spent and budget in <code>history.jsonl</code>.</td></tr>
+                <tr><td>Portal spend</td><td>Cost that comes from real growth in the quota between snapshots.</td></tr>
+                <tr><td>Local estimate</td><td>Cost worked out from OpenCode's records and model prices.</td></tr>
+                <tr><td>Calibration factor</td><td>Ratio that scales the local estimate towards the portal's numbers.</td></tr>
+                <tr><td>Spending per day (burn rate)</td><td>Average cost per day, used to forecast.</td></tr>
+                <tr><td>Lasts until</td><td>Whether, and until when, the budget lasts if you keep spending at the current rate.</td></tr>
+                <tr><td>Cache read / write</td><td>Tokens served from, or stored into, the model's prompt cache.</td></tr>
+                <tr><td>Stale</td><td>Showing saved numbers because a live fetch failed.</td></tr>
+              </tbody>
+            </table></div>
+          </section>
+        </div>
+      </div>
+    </article>
+    <!-- SETUP-VIEW:begin (How to set up tab) -->
+    <article id="view-setup" class="how setup" hidden aria-labelledby="setup-title">
+      <header class="how-head">
+        <h2 id="setup-title">How to set up</h2>
+        <p>From a fresh checkout to numbers on screen. The dashboard needs your GitHub login (for the quota) and your OpenCode data (for the per-day, per-hour and per-model detail).</p>
+      </header>
+
+      <div class="how-layout">
+        <nav class="toc card" aria-label="On this page">
+          <ol>
+            <li><a href="#setup-prereq">Before you start</a></li>
+            <li><a href="#setup-start">Quick start</a></li>
+            <li><a href="#setup-config">Configuration</a></li>
+            <li><a href="#setup-data">Where data is stored</a></li>
+            <li><a href="#setup-network">Host or bridge network</a></li>
+            <li><a href="#setup-offline">When you are offline</a></li>
+            <li><a href="#setup-security">Security</a></li>
+            <li><a href="#setup-trouble">Troubleshooting</a></li>
+          </ol>
+        </nav>
+
+        <div class="how-body">
+          <section class="card" id="setup-prereq" aria-labelledby="setup-prereq-t">
+            <h3 id="setup-prereq-t">1. Before you start</h3>
+            <ul>
+              <li><b>Docker</b> for the web dashboard. Or just <b>python3</b> (3.10 or newer) if you only want the command line or the GTK app.</li>
+              <li><b>The GitHub CLI (<code>gh</code>), logged in to your GitHub host.</b> The dashboard borrows its token; it never asks for a password.
+                <div class="cmd"><pre><code>gh auth login -h github.example.com</code></pre><button type="button" class="copy" aria-label="Copy command">Copy</button></div></li>
+              <li><b>VPN on.</b> The company GitHub API is only reachable from inside the network.</li>
+              <li><b>OpenCode installed</b>, and used at least once. Its database is read from <code>~/.local/share/opencode/opencode.db</code> (read-only).</li>
+            </ul>
+          </section>
+
+          <section class="card" id="setup-start" aria-labelledby="setup-start-t">
+            <h3 id="setup-start-t">2. Quick start</h3>
+            <p><b>Web dashboard (Docker).</b> Clone the repo, then from its folder:</p>
+            <div class="cmd"><pre><code>scripts/web-up.sh -d</code></pre><button type="button" class="copy" aria-label="Copy command">Copy</button></div>
+            <p>Then open <a href="http://localhost:8080">http://localhost:8080</a>. The script reads your token from <code>gh</code>, passes it to the container as a variable (never printed or stored in the image) and builds and starts it. Stop it with <code>docker compose down</code>.</p>
+            <p><b>Command line.</b> No install needed:</p>
+            <div class="cmd"><pre><code>python3 bin/token-monitor --text</code></pre><button type="button" class="copy" aria-label="Copy command">Copy</button></div>
+            <p><b>GTK desktop app.</b> Needs PyGObject with GTK 4 and libadwaita. Run it from the checkout, or install it with symlinks (<code>./scripts/install.sh --undo</code> removes them again):</p>
+            <div class="cmd"><pre><code>python3 bin/token-monitor
+./scripts/install.sh</code></pre><button type="button" class="copy" aria-label="Copy commands">Copy</button></div>
+            <p class="note">Without Docker you can also run the web page yourself: <code>python3 -m token_monitor.web --port 8080</code>. It listens on <code>127.0.0.1</code> only.</p>
+          </section>
+
+          <section class="card" id="setup-config" aria-labelledby="setup-config-t">
+            <h3 id="setup-config-t">3. Configuration</h3>
+            <p>Every setting is optional. Easiest way: copy the example file and edit it.</p>
+            <div class="cmd"><pre><code>cp .env.example .env &amp;&amp; chmod 600 .env</code></pre><button type="button" class="copy" aria-label="Copy command">Copy</button></div>
+            <p>Settings are looked up in this order, first match wins: <b>1.</b> real environment variables, <b>2.</b> the <code>.env</code> file in the repo root, <b>3.</b> <code>~/.config/token-monitor/config</code> (same <code>KEY=VALUE</code> format; the Settings drawer writes there), <b>4.</b> the default.</p>
+            <div class="scroll"><table>
+              <thead><tr><th>Name</th><th>Default</th><th>What it does</th></tr></thead>
+              <tbody>
+                <tr><td><code>TOKEN_MONITOR_SOURCE</code></td><td>auto</td><td><code>github</code>, <code>curl</code> or <code>mock</code>. Auto picks <code>github</code> when a token or a <code>gh</code> login is found, otherwise sample data. Set <code>mock</code> to use sample data on purpose.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_GH_HOST</code></td><td><code>github.com</code></td><td>The GitHub host to ask. For GitHub Enterprise use your host, e.g. <code>github.example.com</code>.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_GH_TOKEN</code></td><td>empty</td><td>A token to use instead of running <code>gh auth token</code>. A secret: keep <code>.env</code> private (mode 600).</td></tr>
+                <tr><td><code>TOKEN_MONITOR_BUDGET</code></td><td>unset</td><td>A fixed budget, <b>in dollars</b>. <span class="warn-text">It hides the real budget:</span> the dashboard shows this number even if GitHub reports another one. Leave it unset unless the source gives no budget. A value set here shows as read-only in Settings.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_CREDITS_PER_USD</code></td><td><code>100</code></td><td>Credits shown as dollars at this rate (30,000 credits = $300). <code>0</code> shows raw credits.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_OPENCODE_DB</code></td><td><code>~/.local/share/opencode/opencode.db</code></td><td>Path to OpenCode's database.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_PROVIDERS</code></td><td><code>github-copilot</code></td><td>Which OpenCode providers are counted, separated by commas.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_HISTORY_DIR</code></td><td><code>./.token-monitor</code></td><td>Folder for <code>history.jsonl</code> (saved snapshots).</td></tr>
+                <tr><td><code>TOKEN_MONITOR_USAGE</code></td><td><code>opencode</code></td><td>Where local usage comes from: <code>opencode</code>, or <code>mock</code> (the default when the source is <code>mock</code>).</td></tr>
+                <tr><td><code>TOKEN_MONITOR_COST_FACTOR</code></td><td>unset</td><td>Multiplier for OpenCode's cost estimate. Unset = worked out from your history, or 1 until there is enough.</td></tr>
+                <tr><td><code>TOKEN_MONITOR_PORT</code></td><td><code>8080</code></td><td>Docker only: the port on this machine. Read by <code>docker-compose</code>, not by the app.</td></tr>
+                <tr><td><code>TZ</code></td><td>host's time zone (<code>UTC</code> if unknown)</td><td>Time zone for the daily and hourly buckets. <code>web-up.sh</code> copies the host's.</td></tr>
+              </tbody>
+            </table></div>
+            <p class="note">There are more keys for the <code>curl</code> source (<code>TOKEN_MONITOR_CURL_CMD</code>, <code>TOKEN_MONITOR_JSON_MAP</code>, <code>TOKEN_MONITOR_UNIT</code>); see <code>.env.example</code>. That source needs <code>curl</code> inside the container, which the Docker image does not have.</p>
+          </section>
+
+          <section class="card" id="setup-data" aria-labelledby="setup-data-t">
+            <h3 id="setup-data-t">4. Where data is stored</h3>
+            <ul>
+              <li><b>History:</b> <code>.token-monitor/history.jsonl</code> in the repo (ignored by git). Every successful fetch adds a snapshot: only four numbers, nothing secret. The CLI, the GTK app and the container share it.</li>
+              <li><b>Last good answer:</b> <code>~/.cache/token-monitor/last-good.json</code>, used when a fetch fails.</li>
+              <li><b>Docker settings:</b> the <code>tm-data</code> volume (budget override, hidden items). It survives <code>docker compose down</code>; <code>docker compose down -v</code> deletes it. It is separate from your host's <code>~/.config/token-monitor</code>.</li>
+              <li><b>OpenCode:</b> your OpenCode folder is mounted read-only into the container (set <code>OPENCODE_DATA_DIR</code> to use another folder). The whole folder is mounted because SQLite's log files must sit next to the database.</li>
+            </ul>
+          </section>
+
+          <section class="card" id="setup-network" aria-labelledby="setup-network-t">
+            <h3 id="setup-network-t">5. Host or bridge network</h3>
+            <p><b>Host networking is the default.</b> The container shares your machine's network, so it sees the VPN and can reach the company GitHub API. The page still listens on <code>127.0.0.1</code> only.</p>
+            <p><b>Bridge</b> is Docker's isolated network. It does not see the VPN, so the company host is usually unreachable from it; use it only when you don't need that (for example sample data). The port is published on <code>127.0.0.1</code>.</p>
+            <div class="cmd"><pre><code>scripts/web-up.sh --bridge</code></pre><button type="button" class="copy" aria-label="Copy command">Copy</button></div>
+          </section>
+
+          <section class="card" id="setup-offline" aria-labelledby="setup-offline-t">
+            <h3 id="setup-offline-t">6. When you are offline</h3>
+            <p>If GitHub can't be reached (VPN down, token expired), the dashboard shows the <b>last saved numbers</b> from the history under an <b>amber banner</b>. If there is no history yet, it shows an error instead. Local OpenCode usage keeps working, since it needs no network.</p>
+            <p>Sample data is never silent: when you see a <b>red MOCK DATA banner</b>, the numbers are not yours.</p>
+          </section>
+
+          <section class="card" id="setup-security" aria-labelledby="setup-security-t">
+            <h3 id="setup-security-t">7. Security</h3>
+            <ul>
+              <li><b>There is no login.</b> Anyone who can open the page can read your usage and change its settings.</li>
+              <li>It is bound to <code>127.0.0.1</code>, so only this machine can open it. Don't expose it to your network, and never to the internet.</li>
+              <li>Your GitHub token is never stored by the app, returned by the API or written to the logs.</li>
+              <li>The OpenCode folder is read-only, but the container can see all of it (including OpenCode's own <code>auth.json</code>, which the app never reads). To avoid that, point <code>OPENCODE_DATA_DIR</code> at a folder holding just a copy of <code>opencode.db</code>.</li>
+            </ul>
+          </section>
+
+          <section class="card" id="setup-trouble" aria-labelledby="setup-trouble-t">
+            <h3 id="setup-trouble-t">8. Troubleshooting</h3>
+            <div class="scroll"><table>
+              <thead><tr><th>You see</th><th>Why, and what to do</th></tr></thead>
+              <tbody>
+                <tr><td>Red <b>MOCK DATA</b> banner</td><td>No token reached the app. Run <code>gh auth login -h github.example.com</code>, then start with <code>scripts/web-up.sh</code> (not a bare <code>docker compose up</code>), or set <code>TOKEN_MONITOR_GH_TOKEN</code> in <code>.env</code>.</td></tr>
+                <tr><td>401, or a token that expired</td><td>Refresh the login, then restart: <code>gh auth refresh -h github.example.com</code>. The container only gets the token when it starts.</td></tr>
+                <tr><td>Amber <b>offline</b> banner</td><td>GitHub is unreachable. Check that the VPN is on, and that you didn't start with <code>--bridge</code>.</td></tr>
+                <tr><td>Empty charts or no models</td><td>The OpenCode database wasn't found or can't be read. Check <code>TOKEN_MONITOR_OPENCODE_DB</code> (or <code>OPENCODE_DATA_DIR</code> in Docker) and the file's permissions: the container runs as your own user so it can read it.</td></tr>
+                <tr><td>Numbers differ from an organisation budget portal</td><td>The portal refreshes with a delay, and it is a different figure: this shows your personal seat quota from GitHub. See "How it's calculated".</td></tr>
+                <tr><td>Hours look shifted</td><td>Set <code>TZ</code> to your time zone.</td></tr>
+                <tr><td>Budget doesn't match GitHub</td><td>A <code>TOKEN_MONITOR_BUDGET</code> override is set (in the environment, <code>.env</code> or Settings). Remove it to show the real one.</td></tr>
+                <tr><td>Port already in use</td><td>Start with <code>TOKEN_MONITOR_PORT=8090 scripts/web-up.sh -d</code>.</td></tr>
+              </tbody>
+            </table></div>
+            <p>Logs: <code>docker compose logs -f token-monitor</code></p>
+          </section>
+        </div>
+      </div>
+    </article>
+    <!-- SETUP-VIEW:end -->
+  </main>
+
+  <dialog id="settings" aria-labelledby="s-title">
+    <form method="dialog" class="drawer-head">
+      <h2 id="s-title">Settings</h2>
+      <button class="btn icon" aria-label="Close settings" value="close">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </form>
+    <div class="drawer-body">
+      <section aria-labelledby="s-budget">
+        <h3 id="s-budget">Budget limit</h3>
+        <p class="hint" id="budget-hint"></p>
+        <div id="budget-form" class="field">
+          <label for="budget-input" id="budget-label">Budget limit</label>
+          <div class="row">
+            <input id="budget-input" type="text" inputmode="decimal" autocomplete="off" placeholder="GitHub value">
+            <button class="btn primary" id="budget-apply" type="button">Apply</button>
+            <button class="btn" id="budget-reset" type="button">Reset to GitHub value</button>
+          </div>
+          <p class="err" id="budget-error" role="alert"></p>
+        </div>
+        <p class="note" id="budget-readonly" hidden></p>
+      </section>
+      <section aria-labelledby="s-prov">
+        <h3 id="s-prov">Providers and models</h3>
+        <p class="hint">Turn a provider off to hide it and all its models. Each provider lists the models seen in recent usage; hiding a model removes it from the charts and rankings. Totals stay the same.</p>
+        <div class="groups" id="groups"></div>
+        <p class="hint" id="mod-empty" hidden>No providers or models yet. They show up once they have been used.</p>
+      </section>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

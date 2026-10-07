@@ -1,0 +1,18 @@
+# Host networking: the default way to run scripts/web-up.sh. Behind a VPN or company proxy the bridge
+# network cannot resolve or reach internal hostnames (GitHub Enterprise, for example):
+#
+#   scripts/web-up.sh        (or: docker compose -f docker-compose.yml -f docker-compose.host-network.yml up --build)
+#
+# The container then shares the host's network, so it sees what the host sees. The dashboard still
+# listens on 127.0.0.1 only. There is no authentication; keep it that way.
+services:
+  token-monitor:
+    network_mode: host
+    ports: !reset []
+    command: ["python3", "-m", "token_monitor.web", "--host", "127.0.0.1", "--port", "${TOKEN_MONITOR_PORT:-8080}"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys,os; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('TOKEN_MONITOR_PORT','8080'), timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 4s
+      start_period: 10s
+      retries: 3

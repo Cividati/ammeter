@@ -1,8 +1,8 @@
 {
-  "uuid": "ammeter@cividati",
-  "name": "Ammeter",
-  "description": "Claude Code, Codex, OpenRouter and DeepSeek usage, credits and quota limits in the top bar. Reads the CLI logins already on this machine; nothing leaves it.",
+  "uuid": "token-monitor@local",
+  "name": "Token Monitor",
+  "description": "GitHub Copilot spend vs. monthly budget in the top bar. Reads mock data or a user-supplied curl command; see docs/WIRING.md.",
   "shell-version": ["45", "46", "47", "48", "49", "50"],
   "version": 1,
-  "url": "https://github.com/Cividati/ammeter"
+  "url": "https://github.com/Cividati/token-monitor"
 }

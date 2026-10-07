@@ -102,3 +102,45 @@ def error_text(exception):
 
 def colour_for(key):
     return COLOURS.get(key, "#e6e6f0")
+
+
+SYMBOLS = {"EUR": "\u20ac", "USD": "$", "GBP": "\u00a3"}
+SPARKS = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
+
+
+def money(value, currency):
+    """Amounts in a currency or a generic unit: '\u20ac187.40', '$5.00', '1,279 cr', '42.3 cr'.
+
+    Known fiat currencies get a symbol and two decimals. Anything else (the default unit is ``cr``,
+    credits) is a suffix, without decimals once the amount is whole or at least 100.
+    """
+    symbol = SYMBOLS.get(currency)
+    if symbol:
+        return f"{symbol}{value:,.2f}"
+    whole = abs(value) >= 100 or abs(value - round(value)) < 0.05
+    return f"{value:,.0f} {currency}" if whole else f"{value:,.1f} {currency}"
+
+
+def human_tokens(count):
+    """12_345 -> '12.3k', 4_200_000 -> '4.2M'."""
+    for limit, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
+        if abs(count) >= limit:
+            return f"{count / limit:.1f}{suffix}"
+    return f"{count:.0f}"
+
+
+def age_text(seconds):
+    """'5m', '3h', '2d' - how long ago something happened."""
+    seconds = max(0, int(seconds))
+    if seconds < 3600:
+        return f"{max(1, seconds // 60)}m"
+    return f"{seconds // 3600}h" if seconds < 86400 * 2 else f"{seconds // 86400}d"
+
+
+def sparkline(values):
+    """One block character per value, scaled to the largest; zero is the lowest block."""
+    top = max(values, default=0)
+    if top <= 0:
+        return SPARKS[0] * len(values)
+    return "".join(SPARKS[min(len(SPARKS) - 1, max(0, int(-(-v / top * len(SPARKS) // 1)) - 1))]
+                   for v in values)
