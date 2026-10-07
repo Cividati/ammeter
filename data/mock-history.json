@@ -1,0 +1,261 @@
+{
+ "_comment": "Sample daily usage for mock mode: a 14-day pattern repeated back from today (day 0 = today). Not real data.",
+ "pattern": [
+  {
+   "cost": 6.2,
+   "messages": 55,
+   "input": 155000,
+   "output": 136400,
+   "reasoning": 18600,
+   "cache_read": 9920000,
+   "cache_write": 744000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "caveman": 5,
+    "ponytail": 1,
+    "confluence-access": 2,
+    "orca-cli": 1
+   }
+  },
+  {
+   "cost": 11.8,
+   "messages": 106,
+   "input": 295000,
+   "output": 259600,
+   "reasoning": 35400,
+   "cache_read": 18880000,
+   "cache_write": 1416000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 3,
+    "caveman": 1,
+    "jira-management": 2,
+    "pr-review": 1
+   }
+  },
+  {
+   "cost": 14.5,
+   "messages": 130,
+   "input": 362500,
+   "output": 319000,
+   "reasoning": 43500,
+   "cache_read": 23200000,
+   "cache_write": 1740000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 6,
+    "ponytail": 1,
+    "orca-cli": 1
+   }
+  },
+  {
+   "cost": 9.1,
+   "messages": 81,
+   "input": 227500,
+   "output": 200200,
+   "reasoning": 27300,
+   "cache_read": 14560000,
+   "cache_write": 1092000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "ponytail": 2,
+    "orca-cli": 2
+   }
+  },
+  {
+   "cost": 2.3,
+   "messages": 20,
+   "input": 57499,
+   "output": 50599,
+   "reasoning": 6899,
+   "cache_read": 3679999,
+   "cache_write": 276000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 5,
+    "caveman": 3,
+    "jira-management": 3,
+    "confluence-access": 1
+   }
+  },
+  {
+   "cost": 0.4,
+   "messages": 3,
+   "input": 10000,
+   "output": 8800,
+   "reasoning": 1200,
+   "cache_read": 640000,
+   "cache_write": 48000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 1,
+    "ponytail": 2,
+    "jira-management": 1,
+    "orca-cli": 1
+   }
+  },
+  {
+   "cost": 8.7,
+   "messages": 78,
+   "input": 217499,
+   "output": 191399,
+   "reasoning": 26099,
+   "cache_read": 13919999,
+   "cache_write": 1043999,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "caveman": 2,
+    "confluence-access": 1
+   }
+  },
+  {
+   "cost": 12.4,
+   "messages": 111,
+   "input": 310000,
+   "output": 272800,
+   "reasoning": 37200,
+   "cache_read": 19840000,
+   "cache_write": 1488000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "caveman": 5,
+    "confluence-access": 2
+   }
+  },
+  {
+   "cost": 10.2,
+   "messages": 91,
+   "input": 254999,
+   "output": 224399,
+   "reasoning": 30599,
+   "cache_read": 16319999,
+   "cache_write": 1224000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 3,
+    "ponytail": 3,
+    "jira-management": 2,
+    "pr-review": 1
+   }
+  },
+  {
+   "cost": 13.9,
+   "messages": 125,
+   "input": 347500,
+   "output": 305800,
+   "reasoning": 41700,
+   "cache_read": 22240000,
+   "cache_write": 1668000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "caveman": 4,
+    "ponytail": 1,
+    "confluence-access": 1,
+    "orca-cli": 1
+   }
+  },
+  {
+   "cost": 7.5,
+   "messages": 67,
+   "input": 187500,
+   "output": 165000,
+   "reasoning": 22500,
+   "cache_read": 12000000,
+   "cache_write": 900000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 2,
+    "jira-management": 1,
+    "pr-review": 1
+   }
+  },
+  {
+   "cost": 1.8,
+   "messages": 16,
+   "input": 45000,
+   "output": 39600,
+   "reasoning": 5400,
+   "cache_read": 2880000,
+   "cache_write": 216000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 5,
+    "jira-management": 3
+   }
+  },
+  {
+   "cost": 0.0,
+   "messages": 0,
+   "input": 0,
+   "output": 0,
+   "reasoning": 0,
+   "cache_read": 0,
+   "cache_write": 0,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "caveman": 6,
+    "ponytail": 2,
+    "orca-cli": 1
+   }
+  },
+  {
+   "cost": 9.6,
+   "messages": 86,
+   "input": 240000,
+   "output": 211200,
+   "reasoning": 28800,
+   "cache_read": 15360000,
+   "cache_write": 1152000,
+   "models": {
+    "claude-sonnet-5.5": 0.7,
+    "gpt-5.1": 0.3
+   },
+   "skills": {
+    "find-skills": 4,
+    "caveman": 2,
+    "jira-management": 2,
+    "confluence-access": 1,
+    "pr-review": 1
+   }
+  }
+ ]
+}

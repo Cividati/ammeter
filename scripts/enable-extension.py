@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Add the Ammeter uuid to org.gnome.shell enabled-extensions, keeping whatever else is enabled.
+"""Add the Token Monitor uuid to org.gnome.shell enabled-extensions, keeping whatever else is enabled.
 
 GNOME Shell loads extensions at session start, so a log out / log in is needed after this.
 """
 import ast
 import subprocess
 
-UUID = "ammeter@cividati"
+UUID = "token-monitor@local"
 KEY = ["gsettings", "get", "org.gnome.shell", "enabled-extensions"]
 
 current = subprocess.run(KEY, capture_output=True, text=True).stdout.strip()

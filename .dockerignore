@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.token-monitor
+.opencode
+dist
+packaging
+gnome-extension
+tests
+docs
+scripts
+**/__pycache__
+*.pyc

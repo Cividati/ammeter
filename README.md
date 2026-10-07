@@ -1,174 +1,216 @@
-# Ammeter
+# Token Monitor
 
-One meter for the usage, credits and quota limits of your AI accounts — as a native desktop app and
-as a GNOME top-bar indicator.
+A monitor for your **GitHub Copilot premium-request quota** against its monthly budget, with local
+usage estimates from [OpenCode](https://opencode.ai). It comes as a browser dashboard (Docker or plain
+Python), a native GTK4 app, a GNOME top-bar indicator and a CLI.
 
-![Ammeter on Ubuntu](docs/screenshot.png)
+- **Quota / budget**: your seat's premium-request quota, read from GitHub in credits and shown in
+  dollars (credits ⇄ USD at a configurable rate, 100 credits = $1 by default), with percent used, what is
+  left and a "lasts until" forecast.
+- **History and offline fallback**: every successful fetch is appended to a local history file; if GitHub
+  is unreachable the last snapshot is shown, labelled stale, with a local estimate on top.
+- **Local usage (no network)**: tokens, estimated cost, models and skills per day and per hour, read
+  read-only from OpenCode's SQLite database.
+- **Charts**: tokens and cost per day / per hour, spend vs. budget with a projection, most used models and
+  skills; Bar / Line / Dots / Pie chart types; 24h to 30-day ranges plus a free **time slice** over the
+  hourly charts; light and dark themes (blue palette).
+- **In-app explanation**: the web dashboard has a "How it's calculated" page, and
+  [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) covers the same ground.
 
-An ammeter measures the current flowing through a circuit. This one measures what your Claude Code,
-Codex, OpenRouter and DeepSeek accounts are drawing: session and weekly quota with reset times and
-countdowns, plus the prepaid balances that quietly run dry.
+> Forked from [Cividati/ammeter](https://github.com/Cividati/ammeter) (MIT). See
+> [Differences from ammeter](#differences-from-ammeter).
 
-## Why another usage monitor
+## Screenshots
 
-- **It uses the logins you already have.** Claude Code and Codex keep an OAuth login on disk and the
-  same usage endpoints their own CLIs read; OpenRouter and DeepSeek are queried with the API keys
-  Hermes already stores. No dashboard login, no browser cookies, no screenshot scraping, no
-  telemetry — nothing leaves the machine.
-- **It survives a rate limit.** Claude's endpoint answers `429` when polled hard, so every provider's
-  last good answer is cached on disk: a fresh process (the CLI, the extension, a second app window)
-  still shows the previous numbers, labelled with the reason, instead of an error.
-- **It knows when a number went stale.** Each quota row carries the window's reset timestamp. If a
-  cached window already rolled over, the percentage is dropped and replaced with
-  *awaiting fresh numbers* — showing a number that is known to be wrong is worse than showing none.
-- **One data layer, three front-ends.** The app, the tkinter floating window and the GNOME extension
-  all render the same normalised rows from `ammeter/core.py`; nothing is formatted twice.
+<p>
+<img src="docs/screenshot-budget.png" width="300" alt="GTK app, Budget page (mock data)">
+<img src="docs/screenshot-usage.png" width="300" alt="GTK app, Usage page (mock data)">
+</p>
 
-## Providers
+*The GTK app's Budget and Usage pages, rendered with the built-in mock data (hence the euro amounts).
+These are early captures; labels and layout have changed slightly since. The web dashboard has no
+screenshot yet.*
 
-| Provider | Credential it reads | Endpoint | What it shows |
-|---|---|---|---|
-| **Claude** | `~/.claude/.credentials.json` | `GET api.anthropic.com/api/oauth/usage` | 5-hour and weekly quota, per-model weekly buckets, reset times |
-| **Codex** | `~/.codex/auth.json` | `GET chatgpt.com/backend-api/wham/usage` | session and weekly rate limits, plan, reset times, credits |
-| **OpenRouter** | `OPENROUTER_API_KEY` in `~/.hermes/.env` | `GET openrouter.ai/api/v1/credits` + `/key` | credit balance, today's and this month's spend |
-| **DeepSeek** | `DEEPSEEK_API_KEY` in `~/.hermes/.env` | `GET api.deepseek.com/user/balance` | credit balance |
+## Quick start
 
-Quota providers get a bar that turns amber at 70% and red at 90%; pay-as-you-go providers get their
-balance, because a percentage of a top-up you can refill is not the same thing as a quota you cannot.
+Requirements: Linux, Python 3.10+, and the [GitHub CLI](https://cli.github.com) (`gh`) logged in
+(`gh auth login`), or a token in `TOKEN_MONITOR_GH_TOKEN`. Without either you get clearly labelled mock
+data.
 
-Numbers are never ambiguous about direction: every percentage is **consumption**, and reads
-`33% used` — the bar fills as the quota is spent, so nothing has to be inferred from a bare `33%`.
-The prepaid providers report money instead of a percentage for the same reason.
-
-## Install
-
-Requirements: a Linux desktop with Python 3.10+; PyGObject with `Gtk-4.0` and `Adw-1.0` for the app
-(Ubuntu 24.04+ and Fedora ship them), `python3-tk` only for `--float`, and `gjs` only for the tests.
+### Web dashboard (Docker)
 
 ```sh
-git clone git@github.com:Cividati/ammeter.git ~/Development/ammeter
-cd ~/Development/ammeter
-./scripts/install.sh          # symlinks the command, the desktop entry and the GNOME extension
-ammeter                       # or launch "Ammeter" from the app grid
+scripts/web-up.sh -d          # takes your token from `gh`, builds and starts the container
+# open http://localhost:8080
 ```
 
-`install.sh` uses symlinks on purpose: edit the checkout and the installed command follows. Use
-`./scripts/install.sh --undo` to remove everything it created.
+It listens on `127.0.0.1` only, uses host networking by default (so a VPN-only GitHub Enterprise host is
+reachable; `--bridge` opts out), reads your OpenCode folder read-only, and shares this checkout's
+`.token-monitor/` history. Without Docker: `python3 -m token_monitor.web --host 127.0.0.1 --port 8080`.
+Details, API and troubleshooting: [docs/WEB.md](docs/WEB.md).
 
-If your checkout is not at `~/Development/ammeter`, change `SCRIPT` at the top of
-`gnome-extension/extension.js` to the path of your `bin/ammeter`.
-
-## Usage
+### CLI
 
 ```sh
-ammeter              # native GTK4 + libadwaita app
-ammeter --float      # frameless, always-on-top tkinter window (see the note below)
-ammeter --text       # plain snapshot for a terminal
-ammeter --json       # machine-readable; this is what the GNOME extension consumes
-ammeter --selftest   # formatting, window expiry, stale and cache fallback; no network
-ammeter --version
+python3 bin/token-monitor --text      # plain snapshot
+python3 bin/token-monitor --json      # machine-readable (what the GNOME extension reads)
+python3 bin/token-monitor --plot      # write .token-monitor/usage.svg (--out FILE)
+python3 bin/token-monitor --float     # frameless always-on-top tkinter window (needs python3-tk)
+python3 bin/token-monitor --selftest  # checks, no network
 ```
 
-```
-✳  CLAUDE  (pro)
-     5h        33% used  ▓▓▓▓░░░░░░░░  resets 14:20 · in 2h07m
-     7d        74% used  ▓▓▓▓▓▓▓▓▓░░░  resets Wed 07 Oct 20:00 · in 2d7h
-◆  CODEX  (go)
-     session  100% used  ▓▓▓▓▓▓▓▓▓▓▓▓  resets Mon 02 Nov 14:33 · in 28d3h
-⇄  OPENROUTER
-     balance  $7.92 left of $60.00
-     spend    $0.00 today   $2.09 month
-◉  DEEPSEEK
-     balance  USD 3.26
+### GTK app and GNOME top bar (from a checkout)
 
-4/4 providers · Ammeter 0.3.0 · refreshed every 120s
-```
-
-## GNOME top-bar indicator
-
-The extension shows a gauge icon that turns amber at 70% and red at 90% (or when a plan limit is
-reached, or data is stale); clicking it lists every provider, the same rows the app renders.
-
-GNOME Shell loads extensions when the session starts and Wayland cannot reload it in place, so after
-installing: **log out and back in**, then check
+Needs PyGObject with `Gtk-4.0` and `Adw-1.0` (GTK 4.14+ for the live charts).
 
 ```sh
-gnome-extensions info ammeter@cividati      # State: ACTIVE
-journalctl --user -b -o cat /usr/bin/gnome-shell | grep -i ammeter
+./scripts/install.sh          # symlinks the command, desktop entry, icon and GNOME extension
+token-monitor                 # or launch "Token Monitor" from the app grid
+./scripts/install.sh --undo   # remove everything again
 ```
+
+The links point into the checkout, so edits take effect at once. The GNOME extension
+(`token-monitor@local`, GNOME Shell 45–50) needs a log out / log in to load on Wayland. The extension runs `~/.local/bin/token-monitor` (or `/usr/bin/token-monitor` when the .deb is installed).
+
+### Debian / Ubuntu package
+
+```sh
+./packaging/build-deb.sh                       # writes dist/token-monitor_<version>_all.deb
+sudo apt install ./dist/token-monitor_0.1.0_all.deb
+```
+
+The package installs the app under `/usr/lib/token-monitor`, the `token-monitor` command, the desktop
+entry, the icon and the GNOME extension. The install directory is not writable, so a `.env` next to the
+code does not work there: put settings in `~/.config/token-monitor/config`. History is kept in
+`~/.local/share/token-monitor/` automatically when the code directory is read-only (override with
+`TOKEN_MONITOR_HISTORY_DIR`).
+
+## Configuration
+
+Copy `.env.example` to `.env` (`chmod 600`) and edit; every setting is optional.
+
+| Setting | Meaning |
+|---|---|
+| `TOKEN_MONITOR_SOURCE` | `github` (default when a token or `gh` login is usable), `curl` or `mock` |
+| `TOKEN_MONITOR_GH_HOST` | GitHub host for the `github` source (default `github.com`; for GitHub Enterprise e.g. `github.example.com`) |
+| `TOKEN_MONITOR_GH_TOKEN` | token to use instead of `gh auth token -h <host>` |
+| `TOKEN_MONITOR_CREDITS_PER_USD` | `github` source: credits per dollar (default 100; `0` shows raw credits) |
+| `TOKEN_MONITOR_UNIT` | unit label when the source names none (`cr` for github, `EUR` otherwise) |
+| `TOKEN_MONITOR_BUDGET` | budget limit in the displayed unit (USD for github); overrides the source's. Also settable in the Settings tab / drawer |
+| `TOKEN_MONITOR_CURL_CMD` | `curl` source: shell command printing the JSON (else `~/.config/token-monitor/curl.sh`) |
+| `TOKEN_MONITOR_JSON_MAP` | `curl` source: `budget=path,spent=path,currency=path,period_end=path` (dotted paths) |
+| `TOKEN_MONITOR_HISTORY_DIR` | where `history.jsonl` and `usage.svg` go (default `./.token-monitor` in the checkout) |
+| `TOKEN_MONITOR_USAGE` | local usage: `opencode` (default with `github`/`curl`) or `mock` (default with `mock`) |
+| `TOKEN_MONITOR_OPENCODE_DB` | OpenCode database path (default `~/.local/share/opencode/opencode.db`) |
+| `TOKEN_MONITOR_PROVIDERS` | OpenCode providers counted, comma-separated (default `github-copilot`) |
+| `TOKEN_MONITOR_COST_FACTOR` | multiplier for OpenCode's cost estimate; unset = calibrated from history, else 1 |
+| `TOKEN_MONITOR_PORT` | web dashboard in Docker: host port (default 8080) |
+
+**Lookup order, first match wins:** real environment variables, then `.env` in the repo root (never
+overrides the environment), then `~/.config/token-monitor/config` (same `KEY=VALUE` format), then the
+default. Docker-only variables (`OPENCODE_DATA_DIR`, `HOST_UID`, `HOST_GID`, `TZ`) are in
+[docs/WEB.md](docs/WEB.md). Hidden providers/models are stored in `~/.config/token-monitor/hidden.json`.
+
+## Data sources and accuracy
+
+| Data | Source | Accuracy |
+|---|---|---|
+| Quota, spend, reset date | `GET https://api.<host>/copilot_internal/user` (`github` source), with your `gh` token | **Exact** for your personal seat. Spend is `entitlement − remaining`; the API's `credits_used` lags slightly and is only a fallback. An undocumented endpoint, it may change. |
+| Same, from an organisation portal | a request you capture and replay (`curl` source, [docs/WIRING.md](docs/WIRING.md)) | Exact as far as the portal is; the SSO cookie expires. |
+| Daily spend | difference between consecutive history snapshots of one period | **Exact** for intervals the app was running (spread over the days by local cost, or by time). Nothing before the first snapshot. |
+| Tokens, models, skills, messages | OpenCode database, read-only | Exact counts, **only for what OpenCode saw**. Other Copilot clients count towards the quota but have no breakdown. |
+| Cost per day / hour / model | OpenCode's own USD estimate × a cost factor | **Estimate**, not billed credits. The factor is `TOKEN_MONITOR_COST_FACTOR`, else calibrated against the exact deltas (once ≥ $1 of local cost is matched), else 1. Hourly views are estimate-only. |
+| Offline numbers | last history snapshot + local cost since | Labelled "offline — last portal data … ago" with `~` estimate marks. |
+| Mock data | `data/mock-*.json` | Fake; labelled "mock data" (red banner on the web). Used only when there is no token, no `gh` login and no history. |
+
+The quota is **your personal seat quota** (shared by every Copilot client: editors, CLI, OpenCode, …),
+not necessarily an organisation budget. Chat and completions are unlimited on the seat and ignored.
+
+## How the numbers are computed
+
+In short: the quota API gives a running total; the history turns snapshots into exact daily deltas;
+OpenCode's local cost estimate fills the gaps and is scaled to the exact numbers by a calibration factor;
+the burn rate behind "lasts until" is the average daily cost of the last 7 days (when local usage explains
+at least half of the period's spend, else the period average). Read
+[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md), or the **How it's calculated** page of the web dashboard
+(`/#how`), which has worked examples and a glossary.
+
+## Security notes
+
+- The web dashboard has **no authentication**. Anyone who can open it can read your usage and change its
+  settings. The compose file publishes it on `127.0.0.1` only; do not expose it to a LAN or the internet.
+- The GitHub token is read at each refresh, sent only to the configured host's API, and never printed,
+  logged, returned by the API or stored. Of the response only numbers and the plan name are kept (no
+  login, email, id or avatar).
+- The OpenCode database is opened read-only; no message text is read. The Docker setup mounts the whole
+  OpenCode folder read-only (SQLite needs the WAL files), which also exposes OpenCode's own credentials
+  file to the container. The app never reads it; see [docs/WEB.md](docs/WEB.md) for how to avoid that.
+- A `curl` source holds an SSO cookie in `.env` or `curl.sh`: keep them mode 600 and out of git. `.env` and
+  `.token-monitor/` are gitignored.
 
 ## Architecture
 
 ```
-bin/ammeter              launcher: makes the package importable, hands over to ammeter.cli
-ammeter/
-  __init__.py            version, app id, palette, icon names
-  providers.py           one fetcher per provider, each returning a normalised entry
-  formatting.py          pure helpers: bars, reset times, severities, error wording
-  core.py                collect(), the row schema, stale handling, expired-window rule
-  cache.py               last-good cache on disk (~/.cache/ammeter/last-good.json)
-  cli.py                 arguments, --text/--json/--selftest, launches a front-end
-  gtk_app.py             GTK4 + libadwaita app (Adw.PreferencesGroup per provider)
-  float_window.py        tkinter always-on-top window
-  ui.css                 stylesheet, with {colour} placeholders filled from __init__.py
-gnome-extension/         top-bar indicator (uuid ammeter@cividati)
-data/                    desktop entry and the provider/app icons
-docs/screenshot.png      the image at the top of this file
-scripts/                 install.sh, fetch-icons.py, enable-extension.py, grab-x11.py
-tests/                   test-format.js (gjs), icon-check.py, glyph-check.py
+bin/token-monitor          launcher: makes the package importable, hands over to token_monitor.cli
+token_monitor/
+  __init__.py              version, app id, palette, icon names
+  settings.py              environment / .env / config lookup
+  history.py               append-only snapshots (.token-monitor/history.jsonl)
+  usage.py                 OpenCode SQLite -> per-day/hour tokens, cost, models, skills; calibration
+  providers.py             Copilot sources: github, curl, mock; offline fallback; "lasts until" row
+  core.py                  collect(), row schema, stale handling
+  filters.py               hidden providers/models (hidden.json)
+  cache.py                 last-good cache on disk
+  formatting.py            pure helpers: bars, reset times, severities, error wording
+  plot.py                  hand-built SVG report (--plot)
+  chart_math.py, charts.py chart helpers (pure) and GTK live charts
+  cli.py, __main__.py      arguments, --text/--json/--selftest, launches a front-end
+  gtk_app.py, ui.css       GTK4 + libadwaita app
+  float_window.py          tkinter always-on-top window
+  web.py, web/             stdlib HTTP server and the dashboard (index.html, app.js, style.css, theme.js)
+  selftest.py              the checks behind --selftest
+gnome-extension/           top-bar indicator (uuid token-monitor@local)
+data/                      desktop entry, icons, mock-budget.json, mock-history.json
+docs/                      HOW-IT-WORKS.md, WEB.md, WIRING.md, RELEASING.md, screenshots
+scripts/                   install.sh, web-up.sh, enable-extension.py, grab-x11.py
+packaging/build-deb.sh     .deb builder
+tests/                     test-format.js (gjs), icon-check.py
+Dockerfile, docker-compose*.yml, .env.example
 ```
 
-Dependencies point one way — `formatting` ← `providers` ← `core` ← `cli`/front-ends — so the data
-layer has no UI imports and the UI has no HTTP code. Each provider entry is a plain dict:
-
-```python
-{"key": "claude", "name": "CLAUDE", "sub": "pro",
- "rows": [{"label": "5h", "pct": 25, "reset": "2026-10-05T13:20:00+00:00",
-           "note": "resets 14:20 · in 2h17m"}],
- "stale": True, "why": "rate limited (HTTP 429)"}   # only when degraded
-```
-
-Add a provider by writing one `fetch_*()` in `providers.py` and adding it to `PROVIDERS`, plus a
-colour in `__init__.py` and an icon in `data/icons/` — every front-end picks it up.
+The data layer is stdlib-only; dependencies point one way: `formatting`, `settings` ← `history`, `usage` ←
+`providers` ← `core` ← `cli` / front-ends.
 
 ## Tests
 
 ```sh
-ammeter --selftest                            # pure Python, no network
-/usr/bin/python3 tests/icon-check.py          # svgs parse; every icon name resolves
-gjs -m tests/test-format.js                   # extension formatting against the real --json output
+python3 bin/token-monitor --selftest   # pure Python, no network
+gjs -m tests/test-format.js            # GNOME extension formatting against the real --json output
+node --check token_monitor/web/app.js  # syntax check of the dashboard script
+/usr/bin/python3 tests/icon-check.py   # svgs parse; icon names resolve (needs a display)
 ```
 
-The GTK app and the extension cannot be unit-tested headlessly, so they are verified by rendering
-them: `scripts/grab-x11.py` screenshots an X server, and the app runs under `xvfb-run` with
-`GDK_BACKEND=x11 GSK_RENDERER=cairo` and no session bus. That is how `docs/screenshot.png` is made.
+## Limitations
 
-## Notes and pitfalls
+- The quota is your **personal seat quota**, not an organisation budget, and comes from an undocumented
+  GitHub endpoint that may change.
+- Cost and per-model figures are **estimates** based on OpenCode's cost data; only OpenCode usage is
+  broken down.
+- Exact daily spend starts at the first recorded snapshot; run the app regularly to collect more.
+- No authentication on the web dashboard (localhost only by design).
+- Linux / GNOME focus. GTK4 cannot pin a window on Wayland, so `--float` (tkinter, via XWayland) is the
+  always-on-top option. The `.deb` is only built and tested on Debian/Ubuntu-style systems.
+- The `curl` source is not available inside the Docker image (no `curl` in the slim image).
 
-- **Claude's usage endpoint rate-limits hard.** `429` with no `Retry-After`; in testing it cleared in
-  two to three minutes. Hence the 120 s interval and the two-layer last-good cache. Stale blocks are
-  labelled with the reason, e.g. `— stale (rate limited (HTTP 429))`.
-- **The Codex endpoint is not a public API** (`chatgpt.com/backend-api/wham/usage`), and
-  `~/.codex/auth.json` / `~/.claude/.credentials.json` are secrets — never log or commit them.
-- **GTK4 cannot pin a window on Wayland**: there is no keep-above API, so the GTK app is a normal
-  decorated window and `--float` remains the pinned option (tkinter, via XWayland).
-- **PyGObject is rarely on the interpreter that `env python3` finds.** Here it exists only on
-  `/usr/bin/python3`, so the GTK app is launched explicitly on that interpreter and the data layer
-  deliberately stays stdlib-only so the CLI works anywhere.
-- **A unique `GApplication` exits silently with no session bus** — no window, no traceback, empty
-  log. Ammeter falls back to `NON_UNIQUE` when `DBUS_SESSION_BUS_ADDRESS` is unset, which is what
-  makes headless screenshots possible. The same rule means a second launch is forwarded to the
-  running instance, so restart the app to pick up code changes.
-- **`Adw.PreferencesPage` scrolls and clamps itself**; wrapping it in `Adw.Clamp` or a
-  `ScrolledWindow` breaks its height allocation. Swap a freshly built page in with
-  `Adw.ToolbarView.set_content()` to refresh.
-- **Icons are shipped svgs, not font glyphs.** The provider marks come from
-  [simple-icons](https://simple-icons.org) (CC0-1.0) via `scripts/fetch-icons.py`; a unicode star in
-  a coloured circle depends on the running font and quietly becomes a placeholder when it is missing.
-  `tests/glyph-check.py` exists for the tkinter front-end, which cannot load svg.
+## Differences from ammeter
 
-## Licence
+[ammeter](https://github.com/Cividati/ammeter) monitors several AI providers. Token Monitor keeps the
+app shell, caching and front-ends but **removed the Claude, Codex, OpenRouter and DeepSeek providers** and
+their icons; it is Copilot-only and adds the credits⇄USD view, history and offline fallback, local
+OpenCode usage, the web dashboard, charts, models/skills rankings and hourly views.
 
-MIT — see [LICENSE](LICENSE). The provider marks in `data/icons` are from simple-icons (CC0-1.0);
-Claude, Codex, OpenRouter and DeepSeek are trademarks of their respective owners, used here only to
-identify the accounts being measured.
+## Credits and licence
+
+Forked from [Cividati/ammeter](https://github.com/Cividati/ammeter). MIT, see [LICENSE](LICENSE). The icons
+in `data/icons/` (the app icon and a generic helmet-style symbolic icon) are drawn for this project; no third-party
+icon sets are shipped, and the removed providers' icons are gone. GitHub Copilot is a trademark of its owner, used only to identify what is measured.

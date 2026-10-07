@@ -1,0 +1,43 @@
+# Token Monitor web dashboard:  docker compose up --build   ->   http://localhost:8080
+#
+# There is NO authentication. The port is published on 127.0.0.1 only, so just this machine can open
+# it. To reach it from your LAN, change the mapping to "0.0.0.0:8080:8080" (or "<lan-ip>:8080:8080")
+# and only do that on a network you trust. Never expose it to the internet: anyone who can open the
+# page can read your usage and change its settings.
+#
+# scripts/web-up.sh fills in TOKEN_MONITOR_GH_TOKEN from `gh auth token` and your uid, then runs this
+# together with docker-compose.host-network.yml (host networking, for VPN use). Use `--bridge` to opt out.
+# Starting compose by hand without a token gives MOCK data (labelled as such in the page).
+services:
+  token-monitor:
+    build: .
+    image: token-monitor:local
+    container_name: token-monitor
+    restart: unless-stopped
+    # Run as your own uid so the read-only OpenCode files (usually mode 600) are readable.
+    # scripts/web-up.sh exports these; set them in .env if you start compose yourself (`id -u`, `id -g`).
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ports:
+      - "127.0.0.1:${TOKEN_MONITOR_PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # The container has no `gh`, so the token comes in as a variable (never baked into the image).
+      TOKEN_MONITOR_GH_TOKEN: ${TOKEN_MONITOR_GH_TOKEN:-}
+      TOKEN_MONITOR_GH_HOST: ${TOKEN_MONITOR_GH_HOST:-github.com}
+      TZ: ${TZ:-UTC}                       # daily and hourly buckets use this time zone
+      HOME: /data/home                     # config lives in /data/home/.config/token-monitor
+      TOKEN_MONITOR_HISTORY_DIR: /data/history
+      TOKEN_MONITOR_SOURCE: ${TOKEN_MONITOR_SOURCE:-}    # empty = auto: github when a token is set
+      TOKEN_MONITOR_OPENCODE_DB: /opencode/opencode.db
+    volumes:
+      - tm-data:/data
+      # The repo's history (shared with the host CLI/GTK app) so the offline fallback has snapshots.
+      - ./.token-monitor:/data/history
+      # OpenCode's database, read-only. The whole folder is mounted (SQLite's WAL files must sit next
+      # to the .db), which also exposes OpenCode's auth.json to this container; see docs/WEB.md.
+      - ${OPENCODE_DATA_DIR:-~/.local/share/opencode}:/opencode:ro
+
+volumes:
+  tm-data:

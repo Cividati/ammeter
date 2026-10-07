@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Token Monitor
+Comment=GitHub Copilot spend vs. monthly budget
+Exec=token-monitor
+Icon=dev.cividati.TokenMonitor
+Terminal=false
+Categories=Utility;System;
+Keywords=copilot;github;budget;spend;credits;tokens;monitor;
+StartupNotify=true
+StartupWMClass=dev.cividati.TokenMonitor

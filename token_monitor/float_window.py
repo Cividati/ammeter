@@ -1,7 +1,7 @@
 """The tkinter front-end: a frameless, always-on-top window.
 
 GTK4 has no keep-above API on Wayland, so this stays as the pinned-window option
-(``ammeter --float``). It is also the fallback when PyGObject is not installed.
+(``token-monitor --float``). It is also the fallback when PyGObject is not installed.
 """
 import queue
 import threading
@@ -10,7 +10,7 @@ import tkinter as tk
 from datetime import datetime
 
 from . import COLOURS, MARKS, REFRESH_SECONDS, STATUS
-from .core import collect
+from .core import collect, visible
 from .formatting import bar, severity, used_label
 
 BACKGROUND = "#0b0b11"
@@ -31,7 +31,7 @@ def _rule(parent, row, tk):
 def run(data, refresh_seconds=REFRESH_SECONDS, framed=False):
     """Show the window and block until it is closed."""
     root = tk.Tk()
-    root.title("Ammeter")
+    root.title("Token Monitor")
     if not framed:
         root.overrideredirect(True)
         root.attributes("-topmost", True)
@@ -100,9 +100,10 @@ def run(data, refresh_seconds=REFRESH_SECONDS, framed=False):
             for row in entry["rows"]:
                 pct = row["pct"]
                 tk.Label(body, text=row["label"], bg=BACKGROUND, fg=DIM, font=(MONO, 10),
-                         anchor="w", width=9).grid(row=line, column=1, sticky="w")
+                         anchor="w", width=10).grid(row=line, column=1, sticky="w")
                 if pct is None:
-                    tk.Label(body, text=row["note"], bg=BACKGROUND, fg=FOREGROUND,
+                    tk.Label(body, text=row["note"], bg=BACKGROUND,
+                             fg=STATUS.get(row.get("level"), FOREGROUND),
                              font=(MONO, 10), anchor="w").grid(
                         row=line, column=2, columnspan=2, sticky="w", padx=(BAR_CELLS + 4, 14))
                 else:
@@ -147,12 +148,12 @@ def run(data, refresh_seconds=REFRESH_SECONDS, framed=False):
 
     def worker():
         while True:
-            incoming.put(collect())
+            incoming.put(visible(collect()))
             time.sleep(refresh_seconds)
 
     def refresh():
         footer.config(text="refreshing\u2026")
-        threading.Thread(target=lambda: incoming.put(collect()), daemon=True).start()
+        threading.Thread(target=lambda: incoming.put(visible(collect())), daemon=True).start()
 
     def pump():
         try:

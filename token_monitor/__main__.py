@@ -1,4 +1,4 @@
-"""python -m ammeter"""
+"""python -m token_monitor"""
 import sys
 
 from .cli import main

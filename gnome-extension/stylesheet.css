@@ -1,4 +1,4 @@
-.ammeter-ok   { color: #8ab4f8; }
-.ammeter-warn { color: #f9c74f; }
-.ammeter-crit { color: #ff5555; }
-.ammeter-row  { font-family: "DejaVu Sans Mono", monospace; font-size: 11px; }
+.token-monitor-ok   { color: #8ab4f8; }
+.token-monitor-warn { color: #f9c74f; }
+.token-monitor-crit { color: #ff5555; }
+.token-monitor-row  { font-family: "DejaVu Sans Mono", monospace; font-size: 11px; }

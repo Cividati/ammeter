@@ -1,21 +1,15 @@
-// Pure formatting for the AI Usage indicator: no GNOME Shell imports, so it is testable on its own.
-// Input is the parsed output of `ai-usage --json`.
+// Pure formatting for the Token Monitor indicator: no GNOME Shell imports, so it is testable on its own.
+// Input is the parsed output of `token-monitor --json`.
 
 export const COLOR = {
-    claude: '#d97757',
-    codex: '#412991',
-    openrouter: '#2dbe7f',
-    deepseek: '#4d6bfe',
+    copilot: '#6e40c9',
     dim: '#9a9aa8',
     text: '#e6e6f0',
     crit: '#ff5555',
 };
 
 export const ICON = {
-    claude: '\u2733',
-    codex: '\u2b22',
-    openrouter: '\u21c4',
-    deepseek: '\u2b24',
+    copilot: '\u25c9',
 };
 
 export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -45,11 +39,15 @@ export function renderLines(data) {
         } else {
             for (const r of d.rows) {
                 if (r.pct === null) {
-                    lines.push(`<span foreground="${COLOR.dim}">${esc(r.label.padEnd(8))}</span>${esc(r.note)}`);
+                    const flagged = r.level === 'crit';
+                    if (flagged)
+                        alert = true;
+                    lines.push(`<span foreground="${COLOR.dim}">${esc(r.label.padEnd(10))}</span>`
+                        + `<span foreground="${flagged ? COLOR.crit : COLOR.text}">${esc(r.note)}</span>`);
                 } else {
                     const pct = Math.round(r.pct);
                     worst = Math.max(worst, pct);
-                    lines.push(`<span foreground="${COLOR.dim}">${esc(r.label.padEnd(8))}</span>`
+                    lines.push(`<span foreground="${COLOR.dim}">${esc(r.label.padEnd(10))}</span>`
                         + `<span foreground="${pct >= 90 ? COLOR.crit : COLOR[d.key] ?? COLOR.text}">${bar(pct)}</span>`
                         + ` ${pct}% used  ${esc(r.note)}`);
                 }
